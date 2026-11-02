@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esPermiso } from "@/lib/permisos";
-import { CODIGO_RE, PIN_RE, correoDeCodigo } from "@/lib/pin";
+import { CODIGO_RE, DOMINIO_PIN, PIN_RE, correoDeCodigo } from "@/lib/pin";
 import { usuarioActual } from "@/lib/usuario";
 
 /** Cada acción vuelve a comprobar en el servidor el permiso de quien la lanza (y la base de datos lo exige otra vez). */
@@ -38,7 +38,8 @@ export async function crearUsuarioPin(form: FormData) {
   if (error || !data.user) {
     return volver(error?.message?.includes("already") ? `El código ${codigo} ya existe.` : "No se ha podido crear el usuario.", "error");
   }
-  const { error: e2 } = await supabase.from("usuarios").update({ nombre, codigo, activo: true }).eq("id", data.user.id);
+  // El código de acceso solo lo fija el servidor al crear la cuenta (desde la app, solo un superadministrador lo cambia).
+  const { error: e2 } = await admin.from("usuarios").update({ nombre, codigo, activo: true }).eq("id", data.user.id);
   if (e2) return volver("Usuario creado, pero no se han guardado sus datos. Revísalo.", "error");
   if (perfil) await supabase.from("usuario_perfil").insert({ usuario_id: data.user.id, perfil_id: perfil, centro_id: centro });
   revalidatePath("/admin");
@@ -83,13 +84,18 @@ export async function quitarPerfil(form: FormData) {
 }
 
 export async function cambiarPin(form: FormData) {
-  const { supabase } = await exigir("admin.usuarios");
+  const { supabase, perfil: yo } = await exigir("admin.usuarios");
   const id = String(form.get("id"));
   const pin = String(form.get("pin") ?? "");
   if (!PIN_RE.test(pin)) return volver("El PIN debe tener de 6 a 12 cifras.", "error");
-  const { data: u } = await supabase.from("usuarios").select("codigo").eq("id", id).maybeSingle();
-  if (!u?.codigo) return volver("Ese usuario entra con Microsoft: no tiene PIN.", "error");
-  const { error } = await createAdminClient().auth.admin.updateUserById(id, { password: pin });
+  const { data: u } = await supabase.from("usuarios").select("codigo,es_admin").eq("id", id).maybeSingle();
+  if (!u) return volver("No encontramos a ese usuario.", "error");
+  if (u.es_admin && !yo.es_admin) return volver("El PIN de un superadministrador solo lo cambia otro superadministrador.", "error");
+  // Solo cuentas de código + PIN (correo interno): nunca se pone contraseña a una cuenta de Microsoft.
+  const admin = createAdminClient();
+  const { data: cuenta } = await admin.auth.admin.getUserById(id);
+  if (!cuenta.user?.email?.toLowerCase().endsWith(`@${DOMINIO_PIN}`)) return volver("Ese usuario entra con Microsoft: no tiene PIN.", "error");
+  const { error } = await admin.auth.admin.updateUserById(id, { password: pin });
   if (error) return volver("No se ha podido cambiar el PIN.", "error");
   volver(`PIN de ${u.codigo} cambiado.`);
 }

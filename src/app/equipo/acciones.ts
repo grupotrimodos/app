@@ -15,9 +15,9 @@ export async function resolverAusencia(form: FormData) {
   const aprobar = form.get("decision") === "aprobar";
   const comentario = String(form.get("comentario") ?? "").trim().slice(0, 300) || null;
   // Los permisos de la base de datos impiden resolver las propias o las de fuera de tus centros.
+  // Al rechazar, la base de datos marca sola que no va a Odoo (el estado de envío solo lo cambia el servidor).
   const { data, error } = await supabase.from("ausencias")
-    .update({ estado: aprobar ? "aprobada" : "rechazada", resuelto_por: uid, resuelto_en: new Date().toISOString(), comentario,
-      odoo_estado: aprobar ? "pendiente" : "no_aplica" })
+    .update({ estado: aprobar ? "aprobada" : "rechazada", resuelto_por: uid, resuelto_en: new Date().toISOString(), comentario })
     .eq("id", id).eq("estado", "pendiente").select("id");
   if (error || !data?.length) return volver("No se ha podido resolver (puede que ya esté resuelta o no sea de tu equipo).", "error");
   if (aprobar) await llamarPython(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });

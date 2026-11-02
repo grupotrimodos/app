@@ -186,8 +186,9 @@ class OdooClient:
 
     def buscar_empleado(self, correo: str | None = None, credencial: str | None = None) -> list[dict]:
         """Empleados activos con ese correo de trabajo o ese código de credencial (campo «barcode»)."""
-        if correo:
-            dominio = [["work_email", "=ilike", correo]]
+        if correo:   # =ilike sin comodines: «_» y «%» del correo se escapan
+            literal = correo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            dominio = [["work_email", "=ilike", literal]]
         elif credencial:
             dominio = [["barcode", "=", credencial]]
         else:

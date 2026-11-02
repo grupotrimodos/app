@@ -79,7 +79,7 @@ class SupabaseFalso:
             for f in filas:
                 f.update(datos)
             self.parches.append((tabla, params, datos))
-            return httpx.Response(204)
+            return httpx.Response(200, json=[{"id": f.get("id")} for f in filas])
         return httpx.Response(405)
 
 
@@ -94,6 +94,7 @@ def entorno(monkeypatch):
     monkeypatch.setenv("SUPABASE_SECRET_KEY", "clave-secreta")
     import servicios.rrhh as rrhh
     rrhh._cache_tipos.clear()
+    monkeypatch.setattr(rrhh, "odoo_real", lambda: True)   # MockOdoo hace de Odoo real en estos tests
     transporte = httpx.MockTransport(sb.handler)
     monkeypatch.setattr(auth, "_cliente_http", lambda: httpx.Client(transport=transporte))
     monkeypatch.setattr(supa, "_cliente", lambda: httpx.Client(transport=transporte))
@@ -158,8 +159,16 @@ def test_dry_run_marca_simulado_sin_escribir_en_odoo(entorno, monkeypatch):
 def test_no_se_pueden_enviar_fichajes_de_otro_sin_permiso(entorno):
     sb, odoo, c = entorno
     _fichaje(sb, 1, "entrada", "07:00", usuario=JEFA)
-    r = c.post("/api/rrhh/fichajes/sincronizar", json={"usuario_id": JEFA}, headers=ANA).json()
-    assert r == {"enviados": 0, "errores": 0} and odoo.asistencias == {}   # sus permisos no le dejan ver esos fichajes
+    r = c.post("/api/rrhh/fichajes/sincronizar", json={"usuario_id": JEFA}, headers=ANA)
+    assert r.status_code == 403 and odoo.asistencias == {}   # no corrige fichajes ni la tiene en sus centros
+    assert sb.tablas["fichajes"][0]["odoo_estado"] == "pendiente"
+
+
+def test_ausencia_que_no_puede_ver_no_se_envia(entorno):
+    sb, odoo, c = entorno
+    sb.tablas["ausencias"].append({"id": 9, "usuario_id": JEFA, "tipo": "vacaciones", "desde": "2026-12-01", "hasta": "2026-12-02",
+                                   "motivo": None, "estado": "aprobada", "odoo_estado": "pendiente"})
+    assert c.post("/api/rrhh/ausencias/9/sincronizar", headers=ANA).status_code == 404 and odoo.ausencias == {}
 
 
 def test_ausencia_aprobada_se_crea_en_odoo_con_su_tipo(entorno, monkeypatch):
@@ -200,7 +209,6 @@ def test_ausencia_sin_tipo_en_odoo_queda_en_error_explicado(entorno, monkeypatch
 def test_la_ficha_de_empleado_se_encuentra_sola_por_correo_o_credencial(entorno, monkeypatch):
     from servicios import rrhh, supa
     sb, odoo, c = entorno
-    monkeypatch.setattr(rrhh, "guardar_enlaces", lambda: True)   # como con el Odoo real
     ana = sb.tablas["usuarios"][0]
     ana.update(odoo_employee_id=None, email="ANA@grupotrimodos.com", codigo=None)
     assert rrhh.empleado("tok-ana", UID) == (41, None)
@@ -283,7 +291,6 @@ def test_sincronizacion_solo_con_cron_secret_o_permiso(entorno, monkeypatch):
 def test_sincronizacion_envia_lo_pendiente_de_todos_y_enlaza_fichas(entorno, monkeypatch):
     from servicios import rrhh
     sb, odoo, c = entorno
-    monkeypatch.setattr(rrhh, "guardar_enlaces", lambda: True)
     sb.tablas["usuarios"][0].update(odoo_employee_id=None, email="ana@grupotrimodos.com", codigo=None)
     _fichaje(sb, 1, "entrada", "07:00")
     _fichaje(sb, 2, "salida", "15:00")
@@ -294,7 +301,8 @@ def test_sincronizacion_envia_lo_pendiente_de_todos_y_enlaza_fichas(entorno, mon
     assert r["resultado"]["empleados"]["enlazados"] == 1 and sb.tablas["usuarios"][0]["odoo_employee_id"] == 41
     assert r["resultado"]["fichajes"]["enviados"] == 2 and len(odoo.asistencias) == 1
     assert r["resultado"]["ausencias"] == {"estado": "ok", "enviado": 1}
-    assert r["resultado"]["vehiculos"]["importados_o_actualizados"] == 2
+    assert r["resultado"]["vehiculos"] | {"estado": "ok"} == {"estado": "ok", "en_odoo": 2, "nuevos": 1, "enlazados": 1,
+                                                             "matricula_cambiada": 0}
     camion = next(v for v in sb.tablas["vehiculos"] if v["matricula"] == "4521 LKM")
     assert camion["odoo_id"] == 501 and camion["activo"] is True                # existente: se enlaza, no se duplica
     assert any(v["matricula"] == "9910 NBC" for v in sb.tablas["vehiculos"])    # nuevo de la flota
@@ -312,13 +320,17 @@ def test_sincronizacion_se_salta_lo_que_no_tiene_su_aplicacion_en_odoo(entorno, 
         "empleados": True, "fichajes": True, "ausencias": False, "vehiculos": False}
 
 
-def test_con_odoo_simulado_no_se_guardan_empleados_ni_camiones_de_prueba(entorno):
+def test_con_odoo_simulado_no_se_guardan_empleados_ni_camiones_de_prueba(entorno, monkeypatch):
+    from servicios import rrhh
     sb, odoo, c = entorno
+    monkeypatch.setattr(rrhh, "odoo_real", lambda: False)
+    _fichaje(sb, 1, "entrada", "07:00")
     sb.tablas["usuarios"][0].update(odoo_employee_id=None, email="ana@grupotrimodos.com")
     antes = len(sb.tablas["vehiculos"])
     r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"}).json()["resultado"]
     assert sb.tablas["usuarios"][0]["odoo_employee_id"] is None and len(sb.tablas["vehiculos"]) == antes
     assert "simulado" in r["vehiculos"]["aviso"]
+    assert sb.tablas["fichajes"][0]["odoo_estado"] == "simulado" and odoo.asistencias == {}   # nada «enviado» a un Odoo de mentira
 
 
 def test_sin_clave_de_servidor_la_sincronizacion_lo_explica(entorno, monkeypatch):

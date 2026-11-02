@@ -10,7 +10,7 @@ App interna de Grupo Trimodos. Leer `README.md` antes de cambiar nada.
 
 ## Reglas
 - Todo texto visible, en **español**, claro y no técnico. Botones grandes; pensado para móvil y cabina.
-- **Secretos nunca en código ni en git** (`.env`, `.env.local`). La clave secreta de Supabase solo en servidor (`src/lib/supabase/admin.ts` con `server-only`, y `servicios/supa.py` solo para la sincronización con Odoo).
+- **Secretos nunca en código ni en git** (`.env`, `.env.local`). La clave secreta de Supabase solo en servidor (`src/lib/supabase/admin.ts` con `server-only`, y `servicios/supa.py` solo para anotar envíos a Odoo y la sincronización).
 - Cambios de base de datos **solo con migraciones nuevas** en `supabase/migrations/` (nunca editar una ya aplicada). Toda tabla nueva con RLS activado y sus políticas.
 - **Permisos:** catálogo único en `src/lib/permisos.json`. Toda función nueva añade ahí sus permisos; páginas con `conPermiso(...)`, RLS con `privado.tengo_permiso` / `privado.puedo_sobre`, nunca roles fijos en el código.
 - Toda ruta de API nueva exige sesión y permiso (`requiere_permiso` en Python). Un test comprueba que ninguna ruta queda abierta.

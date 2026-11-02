@@ -20,9 +20,9 @@ type Estado = {
 };
 
 const NOMBRES_DATO: Record<string, string> = {
-  enlazados: "enlazadas", sin_ficha: "sin ficha", personas: "personas", enviados: "enviados", errores: "con error",
+  enlazados: "enlazados", sin_ficha: "sin ficha", personas: "personas", enviados: "enviados", errores: "con error",
   sin_empleado: "sin ficha de empleado", enviado: "enviadas", simulado: "simuladas", error: "con error", en_odoo: "en Odoo",
-  importados_o_actualizados: "importados o actualizados", no_aplica: "no aplica",
+  nuevos: "nuevos", matricula_cambiada: "con matrícula cambiada", no_aplica: "no aplica",
 };
 
 function resumen(p: Paso) {

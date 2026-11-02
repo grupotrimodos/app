@@ -62,12 +62,15 @@ def leer(token, tabla: str, params: dict) -> list[dict]:
         raise AppError("No se han podido leer los datos. Inténtalo de nuevo.", 503, "sin_conexion_datos")
 
 
-def actualizar(token, tabla: str, filtro: dict, datos: dict) -> None:
+def actualizar(token, tabla: str, filtro: dict, datos: dict) -> int:
+    """Devuelve cuántas filas ha cambiado (las reglas RLS pueden dejarlo en 0 sin dar error)."""
     try:
         with _cliente() as http:
-            r = http.patch(_url(tabla), headers={**_cabeceras(token), "Prefer": "return=minimal"}, params=filtro, json=datos)
+            r = http.patch(_url(tabla), headers={**_cabeceras(token), "Prefer": "return=representation"},
+                           params={**filtro, "select": "id"}, json=datos)
             r.raise_for_status()
-    except httpx.HTTPError:
+            return len(r.json() or [])
+    except (httpx.HTTPError, ValueError):
         raise AppError("No se han podido guardar los datos. Inténtalo de nuevo.", 503, "sin_conexion_datos")
 
 

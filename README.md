@@ -137,8 +137,8 @@ Nadie tiene que decidir dónde va cada dato: `servicios/sincronizacion.py` tiene
 
 - Antes de enviar mira qué aplicaciones están **instaladas** en Odoo; si falta una, ese dato se salta y se explica (nunca se fuerza otro sitio).
 - Se envía **al momento** con cada acción; además hay una **pasada automática** diaria (cron de Vercel a las 4:00 UTC, necesita `CRON_SECRET`) y el botón **Sincronizar ahora** en **Administración → Sincronización** (permiso «Ver y lanzar la sincronización»). Para más pasadas al día: un flujo de n8n que llame a `GET /api/odoo/procesar` con `Authorization: Bearer <CRON_SECRET>`.
-- La pasada usa la **clave de servidor** (`SUPABASE_SECRET_KEY`) porque envía lo pendiente de todas las personas. Cada pasada queda en `odoo_sincronizacion`.
-- Con Odoo simulado (`ODOO_MODE=mock`) no se guarda nada leído de Odoo (ni fichas ni camiones de prueba).
+- El **estado de envío** (enviado, error…) solo lo escribe el servidor con la **clave de servidor** (`SUPABASE_SECRET_KEY`), después de comprobar con el token del usuario que puede ver ese registro. Sin esa variable en Vercel, todo se guarda pero nada llega a Odoo. Cada pasada queda en `odoo_sincronizacion`.
+- Con `RRHH_DRY_RUN=true` o con Odoo simulado (`ODOO_MODE=mock`) los registros quedan como **«simulado»** y no se guarda nada leído de Odoo (ni fichas ni camiones de prueba). Si al pasar a real se quiere enviar lo fichado en pruebas, en el editor SQL de Supabase: `update fichajes set odoo_estado = 'pendiente' where odoo_estado = 'simulado' and momento >= '<fecha>';` (desde la app no se puede).
 - **Añadir un dato nuevo** (p. ej. documentación de vehículos): una entrada en `MAPAS` y su función en `PASOS`, sus lecturas/escrituras en la lista blanca de `odoo_client.py` y sus tests.
 
 ## 6. DECA: reglas y lecciones (no redescubrir)

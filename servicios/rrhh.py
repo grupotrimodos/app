@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import unicodedata
 from datetime import datetime, timezone
 
@@ -43,10 +44,14 @@ def _odoo():
     return _odoo_factory()
 
 
-def guardar_enlaces() -> bool:
-    """Lo leído de Odoo (fichas de empleado, flota) solo se guarda en Supabase con el Odoo REAL: con el simulado se
-    llenaría la base de datos de empleados y camiones de prueba."""
+def odoo_real() -> bool:
+    """Con el Odoo simulado no se envía nada «de verdad» (se marca simulado) ni se guarda nada leído de él: se llenaría
+    la base de datos de empleados y camiones de prueba y los registros quedarían como enviados sin estar en Odoo."""
     return get_settings().mode == "real"
+
+
+def envio_simulado() -> bool:
+    return rrhh_dry_run() or not odoo_real()
 
 
 def _utc_odoo(momento: str) -> str:
@@ -55,8 +60,10 @@ def _utc_odoo(momento: str) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _marcar(token, tabla: str, fila_id: int, estado: str, error: str | None = None) -> None:
-    supa.actualizar(token, tabla, {"id": f"eq.{fila_id}"}, {"odoo_estado": estado, "odoo_error": error})
+def _marcar(tabla: str, fila_id: int, estado: str, error: str | None = None) -> None:
+    """El estado de envío solo lo escribe el servidor (la base de datos no deja hacerlo a los usuarios)."""
+    if not supa.actualizar(supa.SERVICIO, tabla, {"id": f"eq.{fila_id}"}, {"odoo_estado": estado, "odoo_error": error}):
+        raise AppError("No se ha podido anotar el envío a Odoo.", 503, "sin_conexion_datos")
 
 
 # ------------------------------------------------------------------ ficha de empleado (automática)
@@ -84,7 +91,7 @@ def empleado(token, usuario_id: str) -> tuple[int | None, str | None]:
         return None, (f"En Odoo hay varios empleados {donde}: pon el id a mano en Administración" if hay
                       else f"No hay ningún empleado en Odoo {donde}")
     emp = int(hay[0]["id"])
-    if token is supa.SERVICIO and guardar_enlaces():   # solo la sincronización lo guarda (un usuario no edita su ficha)
+    if token is supa.SERVICIO and odoo_real():   # solo la sincronización lo guarda (un usuario no edita su ficha)
         supa.actualizar(token, "usuarios", {"id": f"eq.{usuario_id}", "odoo_employee_id": "is.null"}, {"odoo_employee_id": emp})
     return emp, None
 
@@ -124,23 +131,28 @@ def tipo_ausencia(tipo: str) -> int | None:
 
 # ------------------------------------------------------------------ envío (lo usan las rutas y la sincronización)
 
-def enviar_fichajes(token, usuario_id: str) -> dict:
+def enviar_fichajes(usuario_id: str, limite: float | None = None) -> dict:
+    """Envía lo pendiente de una persona (con la clave de servidor: quien llama ya ha comprobado que puede pedirlo).
+    `limite` (time.monotonic) corta a tiempo; lo que quede sigue pendiente."""
+    token = supa.SERVICIO
     filas = supa.leer(token, "fichajes", {
         "usuario_id": f"eq.{usuario_id}", "odoo_estado": "in.(pendiente,error,sin_empleado)",
         "select": "id,tipo,momento,origen", "order": "momento.asc,id.asc"})
     if not filas:
         return {"enviados": 0, "errores": 0}
-    simulado = rrhh_dry_run()
+    simulado = envio_simulado()
     emp, motivo = (None, None) if simulado else empleado(token, usuario_id)
     if not simulado and not emp:
         for f in filas:
-            _marcar(token, "fichajes", f["id"], "sin_empleado", motivo)
+            _marcar("fichajes", f["id"], "sin_empleado", motivo)
         return {"enviados": 0, "errores": 0, "sin_empleado": len(filas)}
 
     enviados = errores = 0
     for f in filas:
+        if limite is not None and time.monotonic() > limite:
+            break
         if simulado:
-            _marcar(token, "fichajes", f["id"], "simulado")
+            _marcar("fichajes", f["id"], "simulado")
             enviados += 1
             continue
         try:
@@ -155,11 +167,11 @@ def enviar_fichajes(token, usuario_id: str) -> dict:
                 odoo.cerrar_asistencia(abierta["id"], momento)
             else:
                 raise ValueError("En Odoo no hay ninguna entrada abierta que cerrar")
-            _marcar(token, "fichajes", f["id"], "enviado")
+            _marcar("fichajes", f["id"], "enviado")
             enviados += 1
         except Exception as e:
             log.warning("Fichaje %s no enviado a Odoo: %s", f["id"], e)
-            _marcar(token, "fichajes", f["id"], "error", str(e)[:300] if isinstance(e, ValueError) else "Odoo no ha aceptado el fichaje")
+            _marcar("fichajes", f["id"], "error", str(e)[:300] if isinstance(e, ValueError) else "Odoo no ha aceptado el fichaje")
             errores += 1
             if f.get("origen") != "correccion":
                 break   # el orden importa: lo siguiente se reintenta cuando se arregle este
@@ -167,7 +179,9 @@ def enviar_fichajes(token, usuario_id: str) -> dict:
     return {"enviados": enviados, "errores": errores}
 
 
-def enviar_ausencia(token, ausencia_id: int) -> str:
+def enviar_ausencia(ausencia_id: int) -> str:
+    """Envía una ausencia aprobada (con la clave de servidor: quien llama ya ha comprobado que puede verla)."""
+    token = supa.SERVICIO
     filas = supa.leer(token, "ausencias", {"id": f"eq.{ausencia_id}",
                                            "select": "id,usuario_id,tipo,desde,hasta,motivo,estado,odoo_estado"})
     if not filas:
@@ -177,25 +191,25 @@ def enviar_ausencia(token, ausencia_id: int) -> str:
         return "no_aplica"
     if a["odoo_estado"] not in ("pendiente", "error", "sin_empleado"):
         return a["odoo_estado"]
-    if rrhh_dry_run():
-        _marcar(token, "ausencias", a["id"], "simulado")
+    if envio_simulado():
+        _marcar("ausencias", a["id"], "simulado")
         return "simulado"
     emp, motivo = empleado(token, a["usuario_id"])
     if not emp:
-        _marcar(token, "ausencias", a["id"], "sin_empleado", motivo)
+        _marcar("ausencias", a["id"], "sin_empleado", motivo)
         return "sin_empleado"
     try:
         tipo_id = tipo_ausencia(a["tipo"])
         if not tipo_id:
-            _marcar(token, "ausencias", a["id"], "error",
+            _marcar("ausencias", a["id"], "error",
                     f"No encuentro en Odoo un tipo de ausencia para «{a['tipo']}»: créalo allí o fíjalo en ODOO_TIPOS_AUSENCIA")
             return "error"
         _odoo().crear_ausencia(emp, tipo_id, a["desde"], a["hasta"], a.get("motivo") or a["tipo"].replace("_", " ").capitalize())
     except Exception as e:
         log.warning("Ausencia %s no enviada a Odoo: %s", a["id"], e)
-        _marcar(token, "ausencias", a["id"], "error", "Odoo no ha aceptado la ausencia")
+        _marcar("ausencias", a["id"], "error", "Odoo no ha aceptado la ausencia")
         return "error"
-    _marcar(token, "ausencias", a["id"], "enviado")
+    _marcar("ausencias", a["id"], "enviado")
     return "enviado"
 
 
@@ -209,7 +223,12 @@ class SincronizarFichajes(BaseModel):
 def sincronizar_fichajes(body: SincronizarFichajes, u: Usuario = Depends(con_fichaje)):
     if not u.token:   # modo simulado sin Supabase: no hay nada guardado que enviar
         return {"enviados": 0, "errores": 0}
-    return enviar_fichajes(u.token, body.usuario_id or u.id)
+    objetivo = body.usuario_id or u.id
+    if objetivo != u.id:
+        # Los de otra persona: solo quien corrige fichajes y la tiene en sus centros (lo dice la base de datos).
+        if not u.puede("fichaje.corregir") or not supa.leer(u.token, "usuarios", {"id": f"eq.{objetivo}", "select": "id"}):
+            raise AppError("No puedes gestionar a ese usuario.", 403, "sin_permiso")
+    return enviar_fichajes(objetivo)
 
 
 @router.post("/ausencias/{ausencia_id}/sincronizar")
@@ -217,4 +236,6 @@ def sincronizar_ausencia(ausencia_id: int, u: Usuario = Depends(con_ausencias)):
     # Las reglas de la base de datos (RLS) deciden qué ausencias puede ver y marcar: las suyas o las de su equipo.
     if not u.token:
         return {"estado": "no_aplica"}
-    return {"estado": enviar_ausencia(u.token, ausencia_id)}
+    if not supa.leer(u.token, "ausencias", {"id": f"eq.{ausencia_id}", "select": "id"}):
+        raise AppError("No encontramos esa ausencia.", 404, "no_encontrada")
+    return {"estado": enviar_ausencia(ausencia_id)}

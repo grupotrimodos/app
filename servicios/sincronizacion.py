@@ -70,7 +70,7 @@ def _paso_empleados(limite: float) -> dict:
         enlazados += bool(emp)
         sin += not emp
     r = {"enlazados": enlazados, "sin_ficha": sin}
-    if not rrhh.guardar_enlaces():
+    if not rrhh.odoo_real():
         r["aviso"] = "Odoo en modo simulado: no se guarda ningún enlace."
     return r
 
@@ -81,7 +81,7 @@ def _paso_fichajes(limite: float) -> dict:
     for uid in dict.fromkeys(f["usuario_id"] for f in filas):
         if time.monotonic() > limite:
             break
-        r = rrhh.enviar_fichajes(supa.SERVICIO, uid)
+        r = rrhh.enviar_fichajes(uid, limite)
         total["personas"] += 1
         for k in ("enviados", "errores", "sin_empleado"):
             total[k] += r.get(k, 0)
@@ -94,23 +94,51 @@ def _paso_ausencias(limite: float) -> dict:
     for f in filas:
         if time.monotonic() > limite:
             break
-        estado = rrhh.enviar_ausencia(supa.SERVICIO, f["id"])
+        estado = rrhh.enviar_ausencia(f["id"])
         total[estado] = total.get(estado, 0) + 1
     return total
 
 
 def _matricula(m: str) -> str:
-    return " ".join((m or "").upper().replace("-", " ").split())
+    """Igual que el alta a mano en Administración: mayúsculas y espacios simples."""
+    return " ".join((m or "").upper().split())
 
 
 def _paso_vehiculos(limite: float) -> dict:
-    flota = [v for v in _odoo().vehiculos_flota() if _matricula(v["matricula"])]
-    if not rrhh.guardar_enlaces():
+    flota = {v["id"]: v for v in _odoo().vehiculos_flota() if _matricula(v["matricula"])}   # sin repetidos
+    if not rrhh.odoo_real():
         return {"en_odoo": len(flota), "aviso": "Odoo en modo simulado: no se importa ningún camión."}
-    filas = [{"matricula": _matricula(v["matricula"]), "modelo": v.get("modelo"), "odoo_id": v["id"]} for v in flota]
-    if filas:
-        supa.insertar(supa.SERVICIO, "vehiculos", filas, conflicto="matricula")
-    return {"en_odoo": len(flota), "importados_o_actualizados": len(filas)}
+    app = supa.leer(supa.SERVICIO, "vehiculos", {"select": "id,matricula,odoo_id"})
+    por_odoo = {v["odoo_id"]: v for v in app if v.get("odoo_id")}
+    por_matricula = {_matricula(v["matricula"]): v for v in app}
+    nuevos = enlazados = cambiados = repetidos = 0
+    for oid, v in flota.items():
+        if time.monotonic() > limite:
+            break
+        mat = _matricula(v["matricula"])
+        if oid in por_odoo:                                    # ya enlazado: solo se sigue el cambio de matrícula
+            fila = por_odoo[oid]
+            if _matricula(fila["matricula"]) != mat:
+                if mat in por_matricula:
+                    repetidos += 1
+                    continue
+                supa.actualizar(supa.SERVICIO, "vehiculos", {"id": f"eq.{fila['id']}"}, {"matricula": mat})
+                cambiados += 1
+        elif mat in por_matricula:                             # dado de alta a mano: se enlaza (no se toca su modelo)
+            fila = por_matricula[mat]
+            if fila.get("odoo_id"):
+                repetidos += 1
+                continue
+            supa.actualizar(supa.SERVICIO, "vehiculos", {"id": f"eq.{fila['id']}"}, {"odoo_id": oid})
+            enlazados += 1
+        else:
+            supa.insertar(supa.SERVICIO, "vehiculos", {"matricula": mat, "modelo": v.get("modelo"), "odoo_id": oid})
+            por_matricula[mat] = {"matricula": mat, "odoo_id": oid}
+            nuevos += 1
+    r = {"en_odoo": len(flota), "nuevos": nuevos, "enlazados": enlazados, "matricula_cambiada": cambiados}
+    if repetidos:
+        r["aviso"] = f"{repetidos} matrículas repetidas en Odoo o en la app: revísalas"
+    return r
 
 
 PASOS = {"empleados": _paso_empleados, "fichajes": _paso_fichajes, "ausencias": _paso_ausencias, "vehiculos": _paso_vehiculos}
@@ -141,7 +169,7 @@ def procesar(origen: str) -> dict:
             log.exception("Sincronización %s", m["id"])
             resultado[m["id"]] = {"estado": "error", "detalle": e.message if isinstance(e, AppError) else "Odoo no ha respondido."}
     registro = {"inicio": inicio.isoformat(), "fin": datetime.now(timezone.utc).isoformat(), "origen": origen,
-                "resultado": resultado, "modo": "simulado" if rrhh.rrhh_dry_run() else "real"}
+                "resultado": resultado, "modo": "simulado" if rrhh.envio_simulado() else "real"}
     try:
         supa.insertar(supa.SERVICIO, "odoo_sincronizacion", registro)
     except AppError:
@@ -197,8 +225,8 @@ def estado(u: Usuario = Depends(con_permiso)):
     for e in errores:
         e["persona"] = nombres.get(e["usuario_id"], "—")
     return {
-        "modo_odoo": "simulado" if not rrhh.guardar_enlaces() else "real",
-        "envio": "simulado" if rrhh.rrhh_dry_run() else "real",
+        "modo_odoo": "simulado" if not rrhh.odoo_real() else "real",
+        "envio": "simulado" if rrhh.envio_simulado() else "real",
         "automatica": bool((os.environ.get("CRON_SECRET") or "").strip()),
         "mapas": [{**m, "instalada": apps[m["id"]]} for m in MAPAS],
         "pendientes": {"fichajes": cuenta(fichajes), "ausencias": cuenta(ausencias), "sin_ficha": len(sin_ficha)},
