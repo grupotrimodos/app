@@ -11,17 +11,18 @@ App interna para móvil y ordenador. Una sola web (Next.js) con login común y m
 | **Fichaje** | Entrada, pausas y salida. Se guarda en Supabase (registro de jornada) y se envía a Odoo (Asistencias) | `src/app/fichaje/` · `servicios/rrhh.py` |
 | **Vacaciones y ausencias** | Pedir días; el responsable aprueba y se crea la solicitud en Odoo (Ausencias) | `src/app/ausencias/` · `servicios/rrhh.py` |
 | **Mi equipo** | Para responsables: quién ha fichado, ausencias por aprobar, correcciones de fichajes y camión de cada chófer | `src/app/equipo/` |
-| **Mi camión** | Chóferes: camión de hoy por la tarjeta del tacógrafo (Movildata), horas del día y empezar/terminar jornada (ficha a la vez) | `src/app/chofer/` · `servicios/chofer.py`, `servicios/movildata.py` |
+| **Flota** | Centro de tráfico: mapa, última señal, movimiento, combustible, kilómetros, consumo diario y recorridos de los vehículos autorizados en Movildata | `src/app/flota/` · `servicios/flota.py`, `servicios/movildata.py` |
+| **Mi camión** | Chóferes: confirmar el camión, consultar sus datos de Movildata y empezar/terminar jornada (ficha a la vez). La detección por tarjeta solo se simula en pruebas | `src/app/chofer/` · `servicios/chofer.py`, `servicios/movildata.py` |
 
 Todo se publica en **un solo proyecto de Vercel**: Next.js para las pantallas y una función Python (`api/index.py`) para DECA y ARGON.
 
 ```
-src/app/            páginas: inicio, login, admin, fichaje, ausencias, equipo, chofer; /api/sesion/token
+src/app/            páginas: inicio, login, admin, fichaje, ausencias, equipo, chofer, flota; /api/sesion/token
 src/lib/            clientes de Supabase, módulos, PIN
 src/proxy.ts        renueva la sesión y manda al login a quien no la tenga
 public/deca/        PWA de DECA (HTML/JS sin framework, funciona sin cobertura)
 servicios/          API Python: DECA (main.py, service.py, odoo_client.py…), ARGON (argon/), fichaje y ausencias → Odoo
-                    (rrhh.py), Movildata (movildata.py, chofer.py); supa.py lee/escribe en Supabase con el token del usuario
+                    (rrhh.py), Movildata (movildata.py, chofer.py, flota.py); supa.py lee/escribe en Supabase con el token del usuario
 api/index.py        entrada de la función Python en Vercel
 supabase/migrations SQL de tablas, permisos y altas
 tests/              pruebas de la API Python      scripts/  diagnóstico, permisos de Odoo, prueba en navegador
@@ -59,7 +60,7 @@ No hace falta configurar nada: los da de alta un administrador desde **Administr
 
 ### 1.5 Vercel
 1. *Add New Project* → importar `grupotrimodos/app`. Vercel detecta **Next.js** solo; la función Python de `api/index.py` se publica en el mismo proyecto.
-2. *Settings → Environment Variables*: todas las de `.env.example`, marcando como **Sensitive** las secretas (`SUPABASE_SECRET_KEY`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `SECRET_KEY`, `ARGON_CLAVE`, `ARGON_ODOO_PASSWORD`, `CRON_SECRET`). Los cambios de variables se aplican con un **Redeploy**.
+2. *Settings → Environment Variables*: todas las de `.env.example`, marcando como **Sensitive** las secretas (`SUPABASE_SECRET_KEY`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `SECRET_KEY`, `ARGON_CLAVE`, `ARGON_ODOO_PASSWORD`, `CRON_SECRET`, `MOVILDATA_API_KEY`). Los cambios de variables se aplican con un **Redeploy**.
 3. *Settings → Deployment Protection*: desactivar *Vercel Authentication* (la app ya tiene su propio login).
 4. *Settings → Domains*: añadir el subdominio (p. ej. `app.grupotrimodos.com`).
 5. **Uso con personal de la empresa = plan Pro** (el plan Hobby es solo para uso personal y no comercial).
@@ -121,7 +122,11 @@ npx tsc --noEmit && npx next build                         # web
 - **Ficha de empleado automática:** para llegar a Odoo hace falta el id de empleado. Se busca solo: por **correo de trabajo** (quien entra con Microsoft) o por el **código** en el campo «Credencial» (`barcode`) de la ficha (quien entra con código + PIN). Si hay varias o ninguna, la pantalla de Sincronización lo dice y se pone a mano en Administración.
 - **Ausencias:** al aprobarlas se crea la solicitud en `hr.leave`. El tipo de Odoo se elige **solo por su nombre** (vacaciones, enfermedad/médico, asuntos propios, no retribuido…). Para forzarlo: `ODOO_TIPOS_AUSENCIA` (JSON, p. ej. `{"vacaciones": 1}`). En Odoo queda para validar según su flujo.
 - **Mi equipo:** con los permisos «Ver a las personas de sus centros», «Aprobar ausencias» y «Corregir fichajes» (perfil «Responsable» de serie). Nadie aprueba ni corrige lo suyo.
-- **Movildata:** `MOVILDATA_MODE=mock` (por defecto) simula la tarjeta y los datos del día con los camiones dados de alta en Administración. El modo real se implementará con la documentación de su API (`servicios/movildata.py`); mientras, el chófer elige la matrícula a mano.
+- **Movildata real:** configura `MOVILDATA_API_KEY` en Vercel como variable sensible y `MOVILDATA_MODE=real` (si se omite el modo, una clave configurada activa el modo real). Después hay que desplegar esta versión. Una variable antigua `MOVILDATA_MODE=mock` mantiene explícitamente el modo de prueba.
+- **Centro de flota:** `/flota`, protegido por el permiso global **`flota.ver`**, consulta los vehículos que autoriza la cuenta Movildata: no hay matrículas ni un número de vehículos fijados en código. El administrador marca «Ver posición y actividad de toda la flota de Movildata» en los perfiles de tráfico que deban consultarla. Este permiso abarca la cuenta completa, independientemente del centro; no se asigna automáticamente a perfiles existentes.
+- La integración usa solo lecturas documentadas en [la API oficial de Movildata](https://mapi.movildata.com/Help): `GetVehiculos`, `GetLastLocations`, `GetLastConsumptions`, `GetDataBetweenDates` y `GetGPSData`. Los servicios no contratados, sensores sin lectura y errores se muestran como datos no disponibles; nunca se sustituyen por cifras de prueba. Las consultas se reutilizan 60 segundos para limitar llamadas. Una señal de más de 15 minutos se distingue de una posición reciente.
+- El resumen del día y los recorridos usan **Europe/Madrid**. Se puede consultar un recorrido de los últimos 31 días, dentro de la disponibilidad de Movildata. Si supera 1.000 puntos, se simplifica para visualizarlo y se indica. La clave nunca llega al navegador; las rutas `/api/flota/*` exigen sesión real y permiso, incluso cuando DECA está en pruebas.
+- **Mi camión:** el conductor confirma su camión y recibe únicamente la telemetría de su asignación abierta, comprobada con su sesión en Supabase. En modo real no se identifica al conductor por la matrícula ni se calculan tiempos legales de conducción a partir del GPS. En modo `mock` la demostración de tarjeta y jornada se identifica expresamente como simulada.
 - La web llama a la API Python con `VERCEL_URL` (o `APP_URL` si se define). Si el despliegue tiene *Vercel Authentication*, el envío a Odoo falla y queda pendiente para reintentar.
 
 ## 5. Sincronización automática con Odoo

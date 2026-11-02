@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
         { source: "/api/argon/:path*", destination: PY ? `${PY}/api/argon/:path*` : "/api/" },
         { source: "/api/rrhh/:path*", destination: PY ? `${PY}/api/rrhh/:path*` : "/api/" },
         { source: "/api/chofer/:path*", destination: PY ? `${PY}/api/chofer/:path*` : "/api/" },
+        { source: "/api/flota/:path*", destination: PY ? `${PY}/api/flota/:path*` : "/api/" },
         { source: "/api/odoo/:path*", destination: PY ? `${PY}/api/odoo/:path*` : "/api/" },
       ],
       fallback: [],

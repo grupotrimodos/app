@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { TODOS_LOS_PERMISOS, permisosDe } from "@/lib/permisos";
 
@@ -14,7 +15,7 @@ export type Perfil = {
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 /** Usuario con sesión, su fila de «usuarios» y sus permisos (los de todos sus perfiles). Sin sesión, al login. */
-export async function usuarioActual() {
+export const usuarioActual = cache(async function usuarioActual() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const uid = data?.claims?.sub;
@@ -29,7 +30,7 @@ export async function usuarioActual() {
   /** ¿Tiene algún permiso de esta área? (tarjeta del inicio y acceso a su página) */
   const veArea = (area: string) => puede(...permisosDe(area));
   return { supabase, uid, perfil, permisos, puede, veArea };
-}
+});
 
 /** Usuario activo con alguno de los permisos indicados; si no, vuelve al inicio. */
 export async function conPermiso(...ps: string[]) {

@@ -1,73 +1,76 @@
 "use client";
+
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CODIGO_RE, PIN_RE, correoDeCodigo } from "@/lib/pin";
+import Icono from "../Icono";
 
 export default function FormularioLogin({ destino }: { destino: string }) {
   const [codigo, setCodigo] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [cargando, setCargando] = useState(false);
+  const [cargando, setCargando] = useState<"microsoft" | "pin" | null>(null);
 
   async function conMicrosoft() {
     setError(null);
-    setCargando(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "azure",
-      options: {
-        scopes: "email",
-        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(destino)}`,
-      },
-    });
-    if (error) {
-      setError("No se ha podido abrir el inicio de sesión de Microsoft.");
-      setCargando(false);
+    setCargando("microsoft");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "azure",
+        options: { scopes: "email", redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(destino)}` },
+      });
+      if (error) { setError("No se ha podido abrir el inicio de sesión de Microsoft. Inténtalo de nuevo."); setCargando(null); }
+    } catch {
+      setError("No se ha podido conectar. Comprueba tu conexión y vuelve a intentarlo.");
+      setCargando(null);
     }
   }
 
   async function conPin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!CODIGO_RE.test(codigo.trim()) || !PIN_RE.test(pin)) {
-      setError("Revisa el código y el PIN.");
-      return;
+    if (!CODIGO_RE.test(codigo.trim()) || !PIN_RE.test(pin)) { setError("Revisa el código y el PIN."); return; }
+    setCargando("pin");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({ email: correoDeCodigo(codigo), password: pin });
+      if (error) {
+        setError(error.status === 429 ? "Demasiados intentos. Espera unos minutos." : "Código o PIN incorrectos.");
+        setCargando(null);
+        return;
+      }
+      location.assign(destino);
+    } catch {
+      setError("No se ha podido conectar. Comprueba tu conexión y vuelve a intentarlo.");
+      setCargando(null);
     }
-    setCargando(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email: correoDeCodigo(codigo), password: pin });
-    if (error) {
-      setError(error.status === 429 ? "Demasiados intentos. Espera unos minutos." : "Código o PIN incorrectos.");
-      setCargando(false);
-      return;
-    }
-    location.assign(destino);   // navegación completa: también sirve para /deca/, que no es una página de Next
   }
 
-  return (
-    <>
-      <section className="panel">
-        <h2>Personal de oficina</h2>
-        <p className="hint">Con tu cuenta de la empresa (Microsoft).</p>
-        <button className="btn primario ancho" onClick={conMicrosoft} disabled={cargando}>
-          Entrar con Microsoft
-        </button>
-      </section>
-
-      <div className="separador">o</div>
-
-      <form className="panel" onSubmit={conPin} noValidate>
-        <h2>Conductores y operarios</h2>
-        <label htmlFor="codigo">Código</label>
-        <input id="codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} autoComplete="username"
-          autoCapitalize="characters" spellCheck={false} inputMode="text" />
+  return <div className="login-formularios" aria-busy={Boolean(cargando)}>
+    {error && <p className="error" role="alert">{error}</p>}
+    <section className="login-oficina" aria-labelledby="titulo-oficina">
+      <h3 id="titulo-oficina">Personal de oficina</h3>
+      <p className="hint">Utiliza tu cuenta de la empresa.</p>
+      <button className="btn ancho login-microsoft" type="button" onClick={conMicrosoft} disabled={Boolean(cargando)}>
+        <span className="login-microsoft-marca" aria-hidden="true"><i /><i /><i /><i /></span>
+        {cargando === "microsoft" ? "Abriendo Microsoft…" : "Continuar con Microsoft"}
+      </button>
+    </section>
+    <div className="separador">o entra con tu código</div>
+    <form onSubmit={conPin} noValidate>
+      <h3>Conductores y operarios</h3>
+      <div className="login-campos"><div>
+        <label htmlFor="codigo">Código de empleado</label>
+        <input id="codigo" name="codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} autoComplete="username"
+          autoCapitalize="characters" spellCheck={false} inputMode="text" placeholder="Tu código" disabled={Boolean(cargando)} required />
+      </div><div>
         <label htmlFor="pin">PIN</label>
-        <input id="pin" type="password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-          autoComplete="current-password" inputMode="numeric" maxLength={12} />
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn primario ancho" style={{ marginTop: 16 }} disabled={cargando}>Entrar</button>
-        <p className="hint">¿No tienes código o has olvidado el PIN? Pídelo en la oficina.</p>
-      </form>
-    </>
-  );
+        <input id="pin" name="pin" type="password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          autoComplete="current-password" inputMode="numeric" maxLength={12} placeholder="Tu PIN" disabled={Boolean(cargando)} required />
+      </div></div>
+      <button className="btn primario ancho login-entrar" disabled={Boolean(cargando)}>{cargando === "pin" ? "Entrando…" : "Entrar a mi espacio"}<Icono nombre="flecha" size={20} /></button>
+      <p className="login-ayuda">¿No tienes código o has olvidado el PIN?<br /><strong>Contacta con tu oficina.</strong></p>
+    </form>
+  </div>;
 }

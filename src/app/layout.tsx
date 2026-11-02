@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./shell.css";
 
 export const metadata: Metadata = {
   title: "Grupo Trimodos",
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
   icons: { icon: "/deca/favicon.png", apple: "/deca/icons/apple-touch-icon.png" },
 };
 
-export const viewport: Viewport = { themeColor: "#121417", colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: "#152636", colorScheme: "light" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

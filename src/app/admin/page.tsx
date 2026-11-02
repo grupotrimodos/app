@@ -235,7 +235,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         {puede("vehiculos.gestionar") && (
         <section className="panel">
           <h2>Camiones (cabezas tractoras)</h2>
-          <p className="hint">Los chóferes eligen o confirman su camión de esta lista. El «id de Movildata» se rellenará al conectar su API.</p>
+          <p className="hint">Los conductores eligen o confirman su camión de esta lista. El centro de flota consulta directamente los vehículos disponibles en Movildata.</p>
           {(vehiculos ?? []).length > 0 && (
             <table>
               <thead><tr><th>Matrícula</th><th>Modelo</th><th>Centro</th><th>Activo</th></tr></thead>
