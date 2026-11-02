@@ -1,0 +1,20 @@
+# dependencias y compilados
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+.vercel/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# secretos: nunca al repositorio
+.env
+.env.*
+!.env.example
+
+*.pdf

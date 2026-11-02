@@ -1,0 +1,221 @@
+"""Pruebas del escritor ARGON con un Odoo simulado (no se conecta a nada)."""
+import os
+from pathlib import Path
+
+import pytest
+
+import servicios.argon  # noqa: F401  (añade la carpeta al path)
+import argon_escritor as E  # noqa: E402
+
+# La Excel real no se sube al repositorio (datos de clientes): ARGON_EXCEL_PRUEBA=ruta para lanzar estas pruebas.
+EXCEL = os.environ.get("ARGON_EXCEL_PRUEBA", "")
+pytestmark = pytest.mark.skipif(not EXCEL or not Path(EXCEL).exists(), reason="sin ARGON_EXCEL_PRUEBA")
+CFG = {"cliente_id": 1585, "empresa_id": 1, "tipo_pedido_id": 41, "fecha_inicio": "2026-10-15"}
+
+
+class OdooFalso:
+    def __init__(self):
+        self.pedidos, self.lineas, self.eq, self.llamadas, self.sig = {}, {}, {"AIRU6001460": 30558}, 0, 1000
+
+    def __call__(self, modelo, metodo, args, **kw):
+        assert (modelo, metodo) in E.PERMITIDO, (modelo, metodo)
+        self.llamadas += 1
+        if modelo in ("product.product", "res.partner"):
+            return []  # referencias de la Excel: sin datos en el Odoo simulado
+        if modelo == "tms.equipment" and metodo == "search_read":
+            return [{"id": i, "name": n} for n, i in self.eq.items() if n in args[0][0][2]]
+        if modelo == "tms.equipment" and metodo == "create":
+            self.sig += 1; self.eq[args[0]["name"]] = self.sig; return self.sig
+        if modelo == "sale.order" and metodo == "search_read":
+            dom = args[0]
+            if dom[0][0] == "id":
+                return [{"name": self.pedidos[dom[0][2]]["name"]}]
+            return [dict(p, order_line=[l for l, v in self.lineas.items() if v["order_id"][0] == p["id"]])
+                    for p in sorted(self.pedidos.values(), key=lambda p: -p["id"])]
+        if modelo == "sale.order.line" and metodo == "search_read":
+            return [dict(self.lineas[i], id=i) for i in args[0][0][2]]
+        if modelo == "sale.order" and metodo == "create":
+            self.sig += 1; oid = self.sig
+            self.pedidos[oid] = {"id": oid, "name": f"S{oid}", "origin": args[0]["origin"], "state": "draft", "invoice_status": "no"}
+            self._lineas(oid, args[0]["order_line"]); return oid
+        if modelo == "sale.order" and metodo == "write":
+            self._lineas(args[0][0], args[1]["order_line"]); return True
+        if modelo == "sale.order" and metodo == "action_confirm":
+            for i in args[0]: self.pedidos[i]["state"] = "sale"
+            return True
+        raise AssertionError((modelo, metodo))
+
+    def _lineas(self, oid, cmds):
+        for _, _, v in cmds:
+            self.sig += 1
+            self.lineas[self.sig] = {"order_id": [oid, ""], "product_id": [v["product_id"], ""],
+                                     "pickup_date": v["pickup_date"], "equipment_id": [v["equipment_id"], ""] if v["equipment_id"] else False}
+
+
+def test_crea_y_no_duplica():
+    o = OdooFalso()
+    r1 = E.procesar(EXCEL, CFG, real=True, odoo=o, limite_s=999)
+    assert r1["pedidos_creados"] and not r1["errores"], r1["errores"]
+    n = len(o.lineas)
+    r2 = E.procesar(EXCEL, CFG, real=True, odoo=o, limite_s=999)
+    assert r2["lineas_nuevas"] == 0 and len(o.lineas) == n and not r2["pedidos_creados"]
+    # todas las líneas desde el 15/10 y con contenedor
+    assert all(v["pickup_date"] >= "2026-10-15" for v in o.lineas.values())
+    assert all(v["equipment_id"] for v in o.lineas.values())
+
+
+def test_continuacion_si_facturado():
+    o = OdooFalso()
+    E.procesar(EXCEL, CFG, real=True, odoo=o, limite_s=999)
+    pid = next(iter(o.pedidos)); o.pedidos[pid]["invoice_status"] = "invoiced"
+    # una línea del pedido facturado desaparece del Odoo simulado → se vuelve a crear, pero en un pedido «| 2»
+    lid = next(i for i, v in o.lineas.items() if v["order_id"][0] == pid)
+    del o.lineas[lid]
+    r = E.procesar(EXCEL, CFG, real=True, odoo=o, limite_s=999)
+    assert any(p["origin"].endswith("|2") for p in o.pedidos.values()), r
+
+
+def test_modo_prueba_no_escribe():
+    o = OdooFalso()
+    r = E.procesar(EXCEL, CFG, real=False, odoo=o, limite_s=999)
+    assert r["pedidos_creados"] and not o.pedidos and not o.lineas
+
+
+def test_seguridad():
+    with pytest.raises(RuntimeError):
+        E.Odoo("https://www.stinsa.com", "prod", "x", "y", 1)
+
+
+def test_api_prueba(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import argon_api as A
+    monkeypatch.setenv("ARGON_CLAVE", "secreto")
+    monkeypatch.setattr(E, "Odoo", lambda *a, **k: OdooFalso())
+    monkeypatch.setenv("ARGON_ODOO_URL", "https://stinsa18.tecnativa.net"); monkeypatch.setenv("ARGON_ODOO_DB", "d"); monkeypatch.setenv("ARGON_ODOO_USER", "u"); monkeypatch.setenv("ARGON_ODOO_PASSWORD", "p")
+    app = FastAPI(); app.include_router(A.router); c = TestClient(app)
+    datos = Path(EXCEL).read_bytes()
+    assert c.post("/api/argon/procesar", content=datos, headers={"x-clave": "mala"}).status_code == 401
+    r = c.post("/api/argon/procesar?modo=prueba&hoy=2026-10-30", content=datos, headers={"x-clave": "secreto"})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["ok"] and "ARGON · lectura del 30/10/2026" in j["correo_html"] and j["odoo"]["modo"] == "prueba"
+
+
+def test_api_sin_variables_argon_explica_el_fallo(monkeypatch):
+    """Con solo las ODOO_* de producción (app de conductores) no escribe y dice qué falta."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import argon_api as A
+    monkeypatch.setenv("ARGON_CLAVE", "secreto")
+    monkeypatch.setenv("ODOO_URL", "https://www.stinsa.com")
+    for v in ("ARGON_ODOO_URL", "ARGON_ODOO_DB", "ARGON_ODOO_USER", "ARGON_ODOO_PASSWORD"):
+        monkeypatch.delenv(v, raising=False)
+    app = FastAPI(); app.include_router(A.router); c = TestClient(app)
+    r = c.post("/api/argon/procesar?modo=prueba", content=Path(EXCEL).read_bytes(), headers={"x-clave": "secreto"})
+    assert r.status_code == 500 and "ARGON_ODOO_URL" in r.json()["detail"]
+
+
+def test_clave_con_tildes(monkeypatch):
+    """Una ARGON_CLAVE con «ñ» o tildes no debe romper el servicio (antes: 500 TypeError)."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import argon_api as A
+    monkeypatch.setenv("ARGON_CLAVE", "Contraseña-Camión")
+    app = FastAPI(); app.include_router(A.router); c = TestClient(app)
+    mala = c.post("/api/argon/procesar", content=b"PK", headers={"x-clave": "otra"})
+    assert mala.status_code == 401
+    buena = c.post("/api/argon/procesar", content=b"no-excel", headers={"x-clave": "Contraseña-Camión".encode("utf-8")})
+    assert buena.status_code == 400  # la clave pasa; falla solo porque el cuerpo no es una Excel
+
+
+def test_clave_con_punto_medio_en_latin1(monkeypatch):
+    """n8n manda «·» en latin-1 (1 byte): también debe valer."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import argon_api as A
+    monkeypatch.setenv("ARGON_CLAVE", "Argon·Prueba")
+    app = FastAPI(); app.include_router(A.router); c = TestClient(app)
+    assert c.post("/api/argon/procesar", content=b"x", headers={"x-clave": "Argon·Prueba".encode("latin-1")}).status_code == 400
+    assert c.post("/api/argon/procesar", content=b"x", headers={"x-clave": "Argon·Prueba".encode("utf-8")}).status_code == 400
+    assert c.post("/api/argon/procesar", content=b"x", headers={"x-clave": b"Argon.Prueba"}).status_code == 401
+
+
+def test_excel_en_base64(monkeypatch):
+    """n8n envía la Excel como JSON {"excel_b64": ...}."""
+    import base64, json as _json
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import argon_api as A
+    monkeypatch.setenv("ARGON_CLAVE", "secreto")
+    monkeypatch.setattr(E, "Odoo", lambda *a, **k: OdooFalso())
+    for v, x in (("ARGON_ODOO_URL", "https://stinsa18.x"), ("ARGON_ODOO_DB", "d"), ("ARGON_ODOO_USER", "u"), ("ARGON_ODOO_PASSWORD", "p")):
+        monkeypatch.setenv(v, x)
+    app = FastAPI(); app.include_router(A.router); c = TestClient(app)
+    cuerpo = _json.dumps({"excel_b64": base64.b64encode(Path(EXCEL).read_bytes()).decode()})
+    r = c.post("/api/argon/procesar?modo=prueba&hoy=2026-10-30", content=cuerpo, headers={"x-clave": "secreto", "content-type": "application/json"})
+    assert r.status_code == 200, r.text
+    assert c.post("/api/argon/procesar", content=b'{"otra":1}', headers={"x-clave": "secreto"}).status_code == 400
+
+
+def test_enlaces_en_el_correo(monkeypatch):
+    """Nº de pedido con enlace a Odoo y datos que faltan con enlace a su celda de la Excel."""
+    import base64, json as _json
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    import argon_api as A
+
+    class OdooConEnlace(OdooFalso):
+        def enlace(self, i):
+            return f"https://stinsa18.x/odoo/action-sale.action_orders/{i}"
+
+    o = OdooConEnlace()
+    r = E.procesar(EXCEL, CFG, real=True, odoo=o, limite_s=999)
+    assert all(p["url"].endswith(f"/{p['pedido'][1:]}") for p in r["pedidos_creados"])
+    for x in r["pendientes_de_datos"]:
+        assert x["celda"] and all(i["celda"] and "!" in i["celda"] for i in x["ir"]), x
+    monkeypatch.setenv("ARGON_CLAVE", "secreto")
+    monkeypatch.setattr(E, "Odoo", lambda *a, **k: OdooConEnlace())
+    for v, x in (("ARGON_ODOO_URL", "https://stinsa18.x"), ("ARGON_ODOO_DB", "d"), ("ARGON_ODOO_USER", "u"), ("ARGON_ODOO_PASSWORD", "p")):
+        monkeypatch.setenv(v, x)
+    app = FastAPI(); app.include_router(A.router); c = TestClient(app)
+    cuerpo = _json.dumps({"excel_b64": base64.b64encode(Path(EXCEL).read_bytes()).decode(),
+                          "url_excel": "https://sp.example/Doc.aspx?sourcedoc=%7BX%7D&file=ARGON.xlsx"})
+    j = c.post("/api/argon/procesar?modo=real&hoy=2026-10-30", content=cuerpo, headers={"x-clave": "secreto"}).json()
+    assert 'href="https://stinsa18.x/odoo/action-sale.action_orders/' in j["correo_html"]
+    if j["odoo"]["pendientes_de_datos"]:
+        assert "activeCell=" in j["correo_html"]
+
+
+def test_referencias_completan_la_excel():
+    """Con la referencia se completan nombre e ID; con el ID, la referencia. Ambiguas → aviso."""
+    import argon_facturacion as F
+    import argon_referencias as R
+    F.COLS.clear()
+    F.COLS.update({"TARIFAS": {"Servicio": "A", "Producto en Odoo": "E", "ID producto": "F", "Proveedor": "G", "ID proveedor": "H"},
+                   "PRODUCTOS": {"Código": "A", "Producto en Odoo": "E", "ID producto": "F", "Proveedor por defecto": "J", "ID proveedor": "K"},
+                   "CONDUCTORES": {"Código": "A", "ID proveedor": "G"}, "RESERVAS": {"Proveedor": "B", "ID proveedor": "C"}})
+    t1 = {"_fila": 4, "Servicio": "TREN", "Producto en Odoo": "[2250] LLAGOSTA-AMBERES", "ID producto": None, "Proveedor": None, "ID proveedor": 18310}
+    t2 = {"_fila": 5, "Servicio": "TREN", "Ref. producto": "1", "Ref./NIF proveedor": "B12345678"}
+    tablas = {"tarifas": [t1, t2], "productos": {}, "conductores": {}, "reservas": []}
+
+    class O:
+        def __call__(self, modelo, metodo, args, **kw):
+            dom = args[0]
+            if modelo == "product.product":
+                if dom[0][0] == "default_code":
+                    return [{"id": 1, "default_code": "1", "display_name": "[1] A"}, {"id": 2, "default_code": "1", "display_name": "[1] B"}]
+                return []
+            if dom[0] == "|":
+                return [{"id": 7, "ref": False, "vat": "ESB12345678", "display_name": "EMPRESA SL", "parent_id": False, "supplier_rank": 1},
+                        {"id": 8, "ref": False, "vat": "ESB12345678", "display_name": "EMPRESA SL, Almacén", "parent_id": [7, ""], "supplier_rank": 0}]
+            return [{"id": 18310, "ref": False, "vat": "CHE123", "display_name": "HUPAC INTERMODAL SA", "parent_id": False, "supplier_rank": 1}]
+
+    r = R.completar(tablas, O())
+    celdas = {(e["hoja"], e["celda"]): e["valor"] for e in r["escrituras"]}
+    ref_p, ref_v = F.COLS["TARIFAS"]["Ref. producto"], F.COLS["TARIFAS"]["Ref./NIF proveedor"]
+    assert celdas[("TARIFAS", f"{ref_p}3")] == "Ref. producto"           # cabecera nueva
+    assert t2["ID proveedor"] == 7 and t2["Proveedor"] == "EMPRESA SL"   # por NIF, la empresa principal
+    assert celdas[("TARIFAS", f"{ref_v}4")] == "CHE123"                  # referencia desde el ID
+    assert any("repetido" in a["texto"] for a in r["avisos"])            # producto [1] ambiguo
+    assert any("[2250] no existe" in a["texto"] for a in r["avisos"])      # «[2250]» escrito en el nombre se busca

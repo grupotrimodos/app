@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<script>if (location.pathname === "/deca") location.replace("/deca/" + location.search);</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Corrige mercancía, elementos, euro palets y peso de la orden de transporte.">
+<meta name="robots" content="noindex, nofollow">
+<!-- Vista previa al compartir el enlace (WhatsApp, Teams, correo...). Las imágenes necesitan dirección absoluta. -->
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_ES">
+<meta property="og:site_name" content="Grupo Trimodos">
+<meta property="og:title" content="Modificación DECA - Trimodos">
+<meta property="og:description" content="Corrige mercancía, elementos, euro palets y peso de la orden de transporte.">
+<meta property="og:image" content="https://trimodos-conductores-pcsur-elo.vercel.app/img/compartir.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Grupo Trimodos - Modificación DECA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Modificación DECA - Trimodos">
+<meta name="twitter:image" content="https://trimodos-conductores-pcsur-elo.vercel.app/img/compartir.png">
+<link rel="manifest" href="/deca/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/deca/favicon.png">
+<link rel="apple-touch-icon" href="/deca/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="DECA Trimodos">
+<title>Modificación DECA - Trimodos</title>
+<link rel="preload" href="/deca/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/deca/styles.css">
+</head>
+<body>
+<header id="brandbar" class="brandbar"><img id="brand-logo" src="/deca/img/trimodos.png" alt="Grupo Trimodos"></header>
+<div id="err" class="banner bad" role="alert" hidden></div>
+
+<!-- PANTALLA 1: menú -->
+<main id="s-menu" class="screen">
+  <h1>DECA - Trimodos</h1>
+  <p class="lead">Corrige la mercancía, los bultos, los palets y el peso de la orden de transporte.</p>
+  <button id="btn-scan" class="btn primary huge">
+    <svg class="qr" viewBox="0 0 21 21" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" fill-rule="evenodd" d="M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2zM14 0h7v7h-7zM15 1v5h5V1zM16 2h3v3h-3zM0 14h7v7H0zM1 15v5h5v-5zM2 16h3v3H2zM9 0h2v2H9zM9 4h3v2H9zM8 8h2v3H8zM12 8h2v2h-2zM0 9h2v2H0zM4 9h3v2H4zM16 9h2v2h-2zM19 9h2v3h-2zM10 12h3v2h-3zM14 12h3v2h-3zM9 15h2v2H9zM13 15h2v3h-2zM17 15h4v2h-4zM9 19h3v2H9zM16 18h2v3h-2zM19 19h2v2h-2z"/></svg>
+    <span>Escanear orden de transporte</span>
+  </button>
+  <a id="btn-guia" class="btn ghost" href="/deca/guia.html">Cómo se usa (guía)</a>
+  <a id="btn-inicio" class="btn ghost" href="/">Volver al inicio</a>
+  <p id="quien" class="hint" hidden></p>
+  <p id="modo" class="hint" hidden></p>
+</main>
+
+<!-- PANTALLA 2: escáner -->
+<main id="s-scan" class="screen" hidden>
+  <h1>Escanea el código QR</h1>
+  <div class="scan-cam">
+    <div id="cam" class="cam"><video id="video" playsinline muted></video></div>
+    <p id="cam-msg" class="hint" aria-live="polite">Apunta al código QR de la orden.</p>
+    <button id="btn-test-qr" class="btn secondary" hidden>Usar QR de prueba</button>
+  </div>
+  <form id="order-form" class="manual" novalidate>
+    <h2>¿No se lee? Escribe el pedido</h2>
+    <div class="seg" role="radiogroup" aria-label="Empresa">
+      <button type="button" class="btn seg-btn" data-company="transargi" role="radio" aria-checked="false"><img src="/deca/img/transargi.png" alt="TRANSARGI"></button>
+      <button type="button" class="btn seg-btn" data-company="stinsa" role="radio" aria-checked="false"><img src="/deca/img/stinsa.png" alt="STINSA"></button>
+    </div>
+    <input id="order" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="search" placeholder="S2621473" aria-label="Número de pedido">
+    <button id="btn-order" type="submit" class="btn primary">Buscar pedido</button>
+  </form>
+  <button class="btn ghost" data-go="menu">Volver al menú</button>
+</main>
+
+<!-- PANTALLA 3: datos actuales y edición -->
+<main id="s-edit" class="screen" hidden>
+  <h1 id="edit-title">Orden</h1>
+  <div id="edit-banners"></div>
+  <div id="packages"></div>
+  <div class="actions">
+    <button id="btn-review" class="btn primary">Revisar cambios</button>
+    <button class="btn ghost" data-go="menu">Cancelar</button>
+  </div>
+</main>
+
+<!-- PANTALLA 4: resumen, confirmación y resultado -->
+<main id="s-review" class="screen" hidden>
+  <h1 id="review-title">Revisa los cambios</h1>
+  <div id="review-body"></div>
+  <div id="review-actions" class="actions">
+    <button id="btn-save" class="btn primary">Guardar cambios</button>
+    <button id="btn-back-edit" class="btn ghost">Volver y corregir</button>
+  </div>
+  <div id="done-actions" class="actions" hidden>
+    <button id="btn-retry" class="btn primary" hidden>Reintentar PDF</button>
+    <button id="btn-open" class="btn primary">Abrir PDF</button>
+    <button id="btn-download" class="btn secondary">Descargar PDF</button>
+    <button id="btn-share" class="btn secondary" hidden>Compartir</button>
+    <button class="btn ghost" data-go="menu">Volver al menú</button>
+  </div>
+</main>
+
+<div id="confirm" class="overlay" role="alertdialog" aria-modal="true" aria-labelledby="confirm-q" hidden>
+  <div class="dialog">
+    <h2 id="confirm-q">¿Seguro?</h2>
+    <p>Se generará una nueva orden de transporte.</p>
+    <button id="btn-yes" class="btn ok huge">Sí, guardar</button>
+    <button id="btn-no" class="btn danger huge">No, volver</button>
+  </div>
+</div>
+
+    <button type="submit" class="btn primary huge">Entrar</button>
+  </form>
+</div>
+
+<div id="mma" class="overlay" role="alertdialog" aria-modal="true" aria-labelledby="mma-q" hidden>
+  <div class="dialog">
+    <h2 id="mma-q">Revisa el peso</h2>
+    <p>Es posible que el conjunto supere la MMA autorizada, confirme que es correcto el peso.</p>
+    <ul id="mma-list" class="mma-list"></ul>
+    <button id="btn-mma-si" class="btn ok huge">Sí, es correcto</button>
+    <button id="btn-mma-no" class="btn danger huge">No, corregir</button>
+  </div>
+</div>
+
+<div id="busy" class="overlay" hidden>
+  <div class="dialog" role="status" aria-live="polite"><h2 id="busy-msg">Un momento…</h2><div class="progress" aria-hidden="true"><span></span></div></div>
+</div>
+<script src="/deca/app.js"></script>
+</body>
+</html>

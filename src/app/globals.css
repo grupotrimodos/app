@@ -1,0 +1,72 @@
+@font-face {
+  font-family: "Atkinson";
+  src: url("/deca/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+:root {
+  --fondo: #121417;
+  --panel: #1c1f24;
+  --borde: #33373e;
+  --texto: #f2f3f5;
+  --suave: #b4b9c1;
+  --acento: #fcda00;           /* amarillo Grupo Trimodos */
+  --sobre-acento: #121417;
+  --error: #ff8a8a;
+  --ok: #6fd6a4;
+  --r: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--fondo); color: var(--texto); }
+body { font: 17px/1.5 "Atkinson", system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--acento); }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 12px; }
+h1 { font-size: 28px; }
+h2 { font-size: 21px; }
+.marca { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px;
+  background: #fff; border-bottom: 4px solid var(--acento); }
+.marca img { height: 34px; width: auto; display: block; }
+.marca .usuario { color: #121417; font-size: 14px; display: flex; gap: 12px; align-items: center; }
+.contenido { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+.estrecho { max-width: 440px; }
+.panel { background: var(--panel); border: 1px solid var(--borde); border-radius: var(--r); padding: 20px; margin-bottom: 16px; }
+.lead { color: var(--suave); margin: 0 0 20px; }
+.hint { color: var(--suave); font-size: 14px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 0 20px;
+  border-radius: 12px; border: 1px solid var(--borde); background: transparent; color: var(--texto);
+  font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+.btn.primario { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.btn.pequeno { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.btn.ancho { width: 100%; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+label { display: block; font-weight: 700; margin: 14px 0 6px; }
+input, select { width: 100%; min-height: 52px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--borde);
+  background: #0d0f12; color: var(--texto); font: inherit; }
+input[type="checkbox"] { width: 22px; min-height: 22px; height: 22px; accent-color: var(--acento); }
+.error { background: #3a1517; color: var(--error); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+.aviso { background: #2b2610; color: #ffe680; border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+.separador { display: flex; align-items: center; gap: 12px; color: var(--suave); margin: 24px 0; }
+.separador::before, .separador::after { content: ""; flex: 1; border-top: 1px solid var(--borde); }
+.modulos { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.modulo { display: block; text-decoration: none; color: inherit; background: var(--panel); border: 1px solid var(--borde);
+  border-left: 6px solid var(--acento); border-radius: var(--r); padding: 20px; min-height: 120px; }
+.modulo:hover { border-color: var(--acento); }
+.modulo h2 { color: var(--texto); }
+.modulo p { color: var(--suave); margin: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; color: var(--suave); font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+  padding: 8px; border-bottom: 1px solid var(--borde); }
+td { padding: 10px 8px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+.fila-form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); align-items: end; }
+.chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.chips label { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 400; }
+.etiqueta { display: inline-block; font-size: 13px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--borde); color: var(--suave); }
+.etiqueta.ok { color: var(--ok); border-color: #2d6b4f; }
+details > summary { cursor: pointer; color: var(--acento); font-weight: 700; }
+@media (max-width: 700px) {
+  table, thead, tbody, tr, td { display: block; }
+  thead { display: none; }
+  tr { border-bottom: 1px solid var(--borde); padding: 10px 0; }
+  td { border: 0; padding: 4px 0; }
+}
