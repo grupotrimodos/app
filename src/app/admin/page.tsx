@@ -103,6 +103,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         {ok && <p className="aviso" role="status">{ok}</p>}
         {error && <p className="error" role="alert">{error}</p>}
 
+        {puede("admin.sincronizacion") && (
+          <a className="modulo" href="/admin/sincronizacion" style={{ marginBottom: 16 }}>
+            <h2>Sincronización con Odoo</h2>
+            <p>Qué va a dónde, qué falta por enviar y qué hay que arreglar.</p>
+          </a>
+        )}
+
         {gestionaUsuarios && <>
         <section className="panel">
           <h2>Usuarios ({usuarios?.length ?? 0})</h2>

@@ -20,10 +20,11 @@ class SupabaseFalso:
                 {"id": UID, "nombre": "Ana", "activo": True, "permisos": ["fichaje.fichar", "ausencias.pedir", "chofer.usar"], "odoo_employee_id": 41},
                 {"id": JEFA, "nombre": "Jefa", "activo": True, "permisos": ["fichaje.fichar"], "odoo_employee_id": 7, "es_admin": True},
             ],
-            "fichajes": [], "ausencias": [],
+            "fichajes": [], "ausencias": [], "odoo_sincronizacion": [],
             "vehiculos": [{"id": 1, "matricula": "4521 LKM", "activo": True}, {"id": 2, "matricula": "7832 MHT", "activo": True}],
         }
         self.parches = []
+        self.inserciones = []
 
     def _filtra(self, filas, params):
         for k, v in params.items():
@@ -35,10 +36,15 @@ class SupabaseFalso:
             elif op == "in":
                 vals = val.strip("()").split(",")
                 filas = [f for f in filas if str(f.get(k)) in vals]
+            elif op == "is" and val == "null":
+                filas = [f for f in filas if f.get(k) is None]
         return filas
 
     def handler(self, req: httpx.Request):
-        uid = self.tokens.get(req.headers.get("authorization", "")[7:])
+        if req.headers.get("apikey") == "clave-secreta" and "authorization" not in req.headers:
+            uid = "servicio"   # clave de servidor: ve todo (sin RLS)
+        else:
+            uid = self.tokens.get(req.headers.get("authorization", "")[7:])
         if not uid:
             return httpx.Response(401, json={})
         if req.url.path == "/auth/v1/user":
@@ -48,7 +54,19 @@ class SupabaseFalso:
         tabla = req.url.path.rsplit("/", 1)[1]
         params = dict(req.url.params)
         filas = self.tablas[tabla]
-        if tabla in ("fichajes", "ausencias", "usuarios") and uid != JEFA:   # RLS: Ana solo ve lo suyo
+        if req.method == "POST":
+            import json
+            datos = json.loads(req.content)
+            for d in datos if isinstance(datos, list) else [datos]:
+                clave = req.url.params.get("on_conflict")
+                previa = next((f for f in self.tablas.setdefault(tabla, []) if clave and f.get(clave) == d.get(clave)), None)
+                if previa:
+                    previa.update(d)
+                else:
+                    self.tablas[tabla].append({"id": len(self.tablas[tabla]) + 100, **d})
+            self.inserciones.append((tabla, datos))
+            return httpx.Response(201)
+        if tabla in ("fichajes", "ausencias", "usuarios") and uid not in (JEFA, "servicio"):   # RLS: Ana solo ve lo suyo
             filas = [f for f in filas if f.get("usuario_id", f.get("id")) == uid]
         filas = self._filtra(filas, params)
         if req.method == "GET":
@@ -73,6 +91,9 @@ def entorno(monkeypatch):
     sb = SupabaseFalso()
     monkeypatch.setenv("SUPABASE_URL", "https://proyecto.supabase.co")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "clave-publica")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "clave-secreta")
+    import servicios.rrhh as rrhh
+    rrhh._cache_tipos.clear()
     transporte = httpx.MockTransport(sb.handler)
     monkeypatch.setattr(auth, "_cliente_http", lambda: httpx.Client(transport=transporte))
     monkeypatch.setattr(supa, "_cliente", lambda: httpx.Client(transport=transporte))
@@ -154,15 +175,42 @@ def test_ausencia_aprobada_se_crea_en_odoo_con_su_tipo(entorno, monkeypatch):
     assert len(odoo.ausencias) == 1
 
 
-def test_ausencia_pendiente_o_sin_tipo_configurado_no_se_envia(entorno, monkeypatch):
+def test_ausencia_pendiente_no_se_envia_y_el_tipo_de_odoo_se_elige_solo(entorno, monkeypatch):
     sb, odoo, c = entorno
     monkeypatch.delenv("ODOO_TIPOS_AUSENCIA", raising=False)
     sb.tablas["ausencias"].append({"id": 6, "usuario_id": UID, "tipo": "medico", "desde": "2026-12-01", "hasta": "2026-12-01",
                                    "motivo": None, "estado": "pendiente", "odoo_estado": "pendiente"})
     assert c.post("/api/rrhh/ausencias/6/sincronizar", headers=ANA).json() == {"estado": "no_aplica"}
     sb.tablas["ausencias"][0]["estado"] = "aprobada"
+    assert c.post("/api/rrhh/ausencias/6/sincronizar", headers=ANA).json() == {"estado": "enviado"}
+    (aus,) = odoo.ausencias.values()
+    assert aus["tipo_id"] == 2   # «Baja por enfermedad»: elegido por su nombre, sin configurar nada
+
+
+def test_ausencia_sin_tipo_en_odoo_queda_en_error_explicado(entorno, monkeypatch):
+    sb, odoo, c = entorno
+    monkeypatch.delenv("ODOO_TIPOS_AUSENCIA", raising=False)
+    monkeypatch.setattr(odoo, "tipos_ausencia", lambda: [{"id": 9, "name": "Formación"}])
+    sb.tablas["ausencias"].append({"id": 6, "usuario_id": UID, "tipo": "medico", "desde": "2026-12-01", "hasta": "2026-12-01",
+                                   "motivo": None, "estado": "aprobada", "odoo_estado": "pendiente"})
     assert c.post("/api/rrhh/ausencias/6/sincronizar", headers=ANA).json() == {"estado": "error"}
-    assert "ODOO_TIPOS_AUSENCIA" in sb.tablas["ausencias"][0]["odoo_error"] and odoo.ausencias == {}
+    assert "tipo de ausencia" in sb.tablas["ausencias"][0]["odoo_error"] and odoo.ausencias == {}
+
+
+def test_la_ficha_de_empleado_se_encuentra_sola_por_correo_o_credencial(entorno, monkeypatch):
+    from servicios import rrhh, supa
+    sb, odoo, c = entorno
+    monkeypatch.setattr(rrhh, "guardar_enlaces", lambda: True)   # como con el Odoo real
+    ana = sb.tablas["usuarios"][0]
+    ana.update(odoo_employee_id=None, email="ANA@grupotrimodos.com", codigo=None)
+    assert rrhh.empleado("tok-ana", UID) == (41, None)
+    assert ana["odoo_employee_id"] is None            # con el token del usuario no se guarda (no puede editar su ficha)
+    ana.update(email="c001@pin.grupotrimodos.com", codigo="C001")   # entra con código: se busca por credencial
+    assert rrhh.empleado(supa.SERVICIO, UID) == (41, None)
+    assert ana["odoo_employee_id"] == 41              # la sincronización sí lo deja enlazado
+    ana.update(odoo_employee_id=None, codigo="X999")
+    emp, motivo = rrhh.empleado(supa.SERVICIO, UID)
+    assert emp is None and "X999" in motivo
 
 
 def test_chofer_hoy_detecta_camion_de_la_flota_en_modo_simulado(entorno):
@@ -178,7 +226,11 @@ def test_cliente_real_solo_permite_las_operaciones_de_rrhh_previstas():
     from servicios.odoo_client import ALLOWED_CALLS
     hr = {c for c in ALLOWED_CALLS if c[0].startswith("hr.")}
     assert hr == {("hr.attendance", "search_read"), ("hr.attendance", "create"), ("hr.attendance", "write"),
-                  ("hr.leave", "create"), ("hr.attendance", "check_access_rights"), ("hr.leave", "check_access_rights")}
+                  ("hr.leave", "create"), ("hr.attendance", "check_access_rights"), ("hr.leave", "check_access_rights"),
+                  ("hr.leave.type", "search_read"), ("hr.employee", "search_read"), ("hr.employee", "check_access_rights")}
+    # fuera de RRHH, la sincronización solo LEE (flota y aplicaciones instaladas)
+    assert {c for c in ALLOWED_CALLS if c[0] in ("fleet.vehicle", "ir.module.module")} == {
+        ("fleet.vehicle", "search_read"), ("ir.module.module", "search_read")}
     assert not any(m == "unlink" for _, m in ALLOWED_CALLS)
 
 
@@ -212,3 +264,65 @@ def test_cada_ruta_de_la_api_python_tiene_su_rewrite_en_next():
     prefijos = {r.path.split("/")[2] for r in app.routes if getattr(r, "path", "").startswith("/api/")}
     for p in prefijos:
         assert f'source: "/api/{p}/:path*"' in config, p
+
+
+# ------------------------------------------------------------------ sincronización automática
+
+def test_sincronizacion_solo_con_cron_secret_o_permiso(entorno, monkeypatch):
+    sb, odoo, c = entorno
+    monkeypatch.setenv("CRON_SECRET", "secreto-cron")
+    assert c.get("/api/odoo/procesar").status_code == 401
+    assert c.get("/api/odoo/procesar", headers={"Authorization": "Bearer otro"}).status_code == 401
+    assert c.get("/api/odoo/procesar", headers=ANA).status_code == 403          # sin «admin.sincronizacion»
+    assert c.get("/api/odoo/estado", headers=ANA).status_code == 403
+    r = c.get("/api/odoo/procesar", headers={"Authorization": "Bearer secreto-cron"})
+    assert r.status_code == 200 and r.json()["origen"] == "automatica"
+    assert sb.inserciones[-1][0] == "odoo_sincronizacion"                      # queda registrada
+
+
+def test_sincronizacion_envia_lo_pendiente_de_todos_y_enlaza_fichas(entorno, monkeypatch):
+    from servicios import rrhh
+    sb, odoo, c = entorno
+    monkeypatch.setattr(rrhh, "guardar_enlaces", lambda: True)
+    sb.tablas["usuarios"][0].update(odoo_employee_id=None, email="ana@grupotrimodos.com", codigo=None)
+    _fichaje(sb, 1, "entrada", "07:00")
+    _fichaje(sb, 2, "salida", "15:00")
+    sb.tablas["ausencias"].append({"id": 7, "usuario_id": UID, "tipo": "vacaciones", "desde": "2026-12-01", "hasta": "2026-12-02",
+                                   "motivo": None, "estado": "aprobada", "odoo_estado": "pendiente"})
+    r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"}).json()   # la jefa es superadmin
+    assert r["origen"].startswith("manual")
+    assert r["resultado"]["empleados"]["enlazados"] == 1 and sb.tablas["usuarios"][0]["odoo_employee_id"] == 41
+    assert r["resultado"]["fichajes"]["enviados"] == 2 and len(odoo.asistencias) == 1
+    assert r["resultado"]["ausencias"] == {"estado": "ok", "enviado": 1}
+    assert r["resultado"]["vehiculos"]["importados_o_actualizados"] == 2
+    camion = next(v for v in sb.tablas["vehiculos"] if v["matricula"] == "4521 LKM")
+    assert camion["odoo_id"] == 501 and camion["activo"] is True                # existente: se enlaza, no se duplica
+    assert any(v["matricula"] == "9910 NBC" for v in sb.tablas["vehiculos"])    # nuevo de la flota
+
+
+def test_sincronizacion_se_salta_lo_que_no_tiene_su_aplicacion_en_odoo(entorno, monkeypatch):
+    sb, odoo, c = entorno
+    monkeypatch.setattr(odoo, "instalados", {"hr", "hr_attendance"})
+    r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"}).json()["resultado"]
+    assert r["ausencias"]["estado"] == "sin_app" and "Ausencias" in r["ausencias"]["detalle"]
+    assert r["vehiculos"]["estado"] == "sin_app"
+    assert r["fichajes"]["estado"] == "ok"
+    estado = c.get("/api/odoo/estado", headers={"Authorization": "Bearer tok-jefa"}).json()
+    assert {m["id"]: m["instalada"] for m in estado["mapas"]} == {
+        "empleados": True, "fichajes": True, "ausencias": False, "vehiculos": False}
+
+
+def test_con_odoo_simulado_no_se_guardan_empleados_ni_camiones_de_prueba(entorno):
+    sb, odoo, c = entorno
+    sb.tablas["usuarios"][0].update(odoo_employee_id=None, email="ana@grupotrimodos.com")
+    antes = len(sb.tablas["vehiculos"])
+    r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"}).json()["resultado"]
+    assert sb.tablas["usuarios"][0]["odoo_employee_id"] is None and len(sb.tablas["vehiculos"]) == antes
+    assert "simulado" in r["vehiculos"]["aviso"]
+
+
+def test_sin_clave_de_servidor_la_sincronizacion_lo_explica(entorno, monkeypatch):
+    sb, odoo, c = entorno
+    monkeypatch.delenv("SUPABASE_SECRET_KEY")
+    r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"})
+    assert r.status_code == 503 and "SUPABASE_SECRET_KEY" in r.json()["error"]

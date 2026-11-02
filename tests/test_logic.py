@@ -464,7 +464,7 @@ def test_todas_las_rutas_exigen_sesion_salvo_health_y_argon():
     for r in rutas:
         if r.path.startswith("/api/argon/"):
             continue  # proceso ARGON: lo llama n8n con su propia clave (ARGON_CLAVE); se comprueba abajo
-        assert r.path.split("/")[2] in ("deca", "rrhh", "chofer"), r.path
+        assert r.path.split("/")[2] in ("deca", "rrhh", "chofer", "odoo"), r.path
         deps = [d.call for d in r.dependant.dependencies]
         protegida = any(hasattr(d, "permiso") for d in deps)
         assert protegida == (r.path != "/api/deca/health"), r.path

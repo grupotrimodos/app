@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 // La API Python (DECA y ARGON) vive en api/index.py. En local corre aparte con uvicorn (puerto 8000);
-// en Vercel es una función Python del mismo proyecto y recibe la ruta original (/api/deca, argon, rrhh, chofer).
+// en Vercel es una función Python del mismo proyecto y recibe la ruta original (/api/deca, argon, rrhh, chofer, odoo).
 // Toda ruta nueva de la API Python necesita aquí su rewrite (un test lo comprueba).
 const PY = process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "";
 
@@ -20,6 +20,7 @@ const nextConfig: NextConfig = {
         { source: "/api/argon/:path*", destination: PY ? `${PY}/api/argon/:path*` : "/api/" },
         { source: "/api/rrhh/:path*", destination: PY ? `${PY}/api/rrhh/:path*` : "/api/" },
         { source: "/api/chofer/:path*", destination: PY ? `${PY}/api/chofer/:path*` : "/api/" },
+        { source: "/api/odoo/:path*", destination: PY ? `${PY}/api/odoo/:path*` : "/api/" },
       ],
       fallback: [],
     };

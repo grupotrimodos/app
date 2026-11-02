@@ -7,5 +7,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Fuera: estáticos, la PWA de DECA (se protege por su API y funciona sin cobertura) y la API Python.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|deca|api/deca/|api/argon/|api/rrhh/|api/chofer/|.*\\.(?:png|jpg|svg|ico|webp|woff2|webmanifest)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|deca|api/deca/|api/argon/|api/rrhh/|api/chofer/|api/odoo/|.*\\.(?:png|jpg|svg|ico|webp|woff2|webmanifest)$).*)"],
 };

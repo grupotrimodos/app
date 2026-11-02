@@ -129,6 +129,31 @@ class MockOdoo:
         self.ausencias[i] = {"employee_id": empleado_id, "tipo_id": tipo_id, "desde": desde, "hasta": hasta, "nombre": nombre}
         return i
 
+    # ---- lecturas de la sincronización automática
+    instalados = {"hr", "hr_attendance", "hr_holidays", "fleet"}
+    empleados = [{"id": 41, "name": "Ana Conductora", "work_email": "ana@grupotrimodos.com", "barcode": "C001"},
+                 {"id": 7, "name": "Jefa de tráfico", "work_email": "jefa@grupotrimodos.com", "barcode": None}]
+
+    def modulos_instalados(self, nombres):
+        return {n for n in nombres if n in self.instalados}
+
+    def buscar_empleado(self, correo=None, credencial=None):
+        if correo:
+            hay = [e for e in self.empleados if (e["work_email"] or "").lower() == correo.lower()]
+        elif credencial:
+            hay = [e for e in self.empleados if e["barcode"] == credencial]
+        else:
+            hay = []
+        return [{"id": e["id"], "name": e["name"]} for e in hay][:2]
+
+    def tipos_ausencia(self):
+        return [{"id": 1, "name": "Vacaciones"}, {"id": 2, "name": "Baja por enfermedad"},
+                {"id": 3, "name": "Asuntos propios"}, {"id": 4, "name": "Permiso no retribuido"}]
+
+    def vehiculos_flota(self):
+        return [{"id": 501, "matricula": "4521 LKM", "modelo": "Volvo FH 500"},
+                {"id": 502, "matricula": "9910 NBC", "modelo": "Scania R 450"}]
+
     def post_note(self, task_id, html_body):
         self.notes.append((task_id, html_body))
 

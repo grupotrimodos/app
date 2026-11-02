@@ -20,6 +20,10 @@ GOODS_MODEL = "tms.goods"
 ATTACHMENT_MODEL = "ir.attachment"
 ATTENDANCE_MODEL = "hr.attendance"   # fichajes
 LEAVE_MODEL = "hr.leave"             # ausencias
+LEAVE_TYPE_MODEL = "hr.leave.type"   # tipos de ausencia (se eligen solos por su nombre)
+EMPLOYEE_MODEL = "hr.employee"       # enlazar cada persona de la app con su ficha de empleado
+FLEET_MODEL = "fleet.vehicle"        # flota: se importan los camiones
+MODULE_MODEL = "ir.module.module"    # qué aplicaciones de Odoo están instaladas (decide a dónde va cada dato)
 
 TASK_FIELDS = ["name", "company_id", "stage_id", "is_transport_order", "tms_package_ids", "tms_transport_order_attachment_id"]
 PACKAGE_FIELDS = [
@@ -49,6 +53,11 @@ ALLOWED_CALLS = {
     (ATTENDANCE_MODEL, "create"),       # solo vía abrir_asistencia (employee_id, check_in)
     (ATTENDANCE_MODEL, "write"),        # solo vía cerrar_asistencia (check_out)
     (LEAVE_MODEL, "create"),            # solo vía crear_ausencia
+    # Lecturas de la sincronización automática (solo lectura)
+    (LEAVE_TYPE_MODEL, "search_read"),  # solo vía tipos_ausencia
+    (EMPLOYEE_MODEL, "search_read"),    # solo vía buscar_empleado
+    (FLEET_MODEL, "search_read"),       # solo vía vehiculos_flota
+    (MODULE_MODEL, "search_read"),      # solo vía modulos_instalados
 }
 
 # Permisos que se comprueban sin ejecutar nada: (modelo, operación, ¿debería tenerlo el usuario técnico?)
@@ -63,6 +72,7 @@ EXPECTED_PERMISSIONS = [
     (ATTENDANCE_MODEL, "read", True), (ATTENDANCE_MODEL, "create", True), (ATTENDANCE_MODEL, "write", True),
     (ATTENDANCE_MODEL, "unlink", False),
     (LEAVE_MODEL, "create", True), (LEAVE_MODEL, "unlink", False),
+    (EMPLOYEE_MODEL, "read", True), (EMPLOYEE_MODEL, "write", False), (EMPLOYEE_MODEL, "unlink", False),
 ]
 ALLOWED_CALLS |= {(m, "check_access_rights") for m, _, _ in EXPECTED_PERMISSIONS}
 
@@ -163,6 +173,35 @@ class OdooClient:
             "employee_id": int(empleado_id), "holiday_status_id": int(tipo_id),
             "request_date_from": desde, "request_date_to": hasta, "name": nombre[:120],
         }])
+
+    # ---- lecturas para la sincronización automática -----------------------------
+    def modulos_instalados(self, nombres: list[str]) -> set[str] | None:
+        """Cuáles de estas aplicaciones están instaladas. None si el usuario de Odoo no puede consultarlo."""
+        try:
+            rows = self._call(MODULE_MODEL, "search_read", [[["name", "in", list(nombres)], ["state", "=", "installed"]]],
+                              {"fields": ["name"]})
+        except Exception:
+            return None
+        return {r["name"] for r in rows}
+
+    def buscar_empleado(self, correo: str | None = None, credencial: str | None = None) -> list[dict]:
+        """Empleados activos con ese correo de trabajo o ese código de credencial (campo «barcode»)."""
+        if correo:
+            dominio = [["work_email", "=ilike", correo]]
+        elif credencial:
+            dominio = [["barcode", "=", credencial]]
+        else:
+            return []
+        return self._call(EMPLOYEE_MODEL, "search_read", [dominio], {"fields": ["id", "name"], "limit": 2})
+
+    def tipos_ausencia(self) -> list[dict]:
+        return self._call(LEAVE_TYPE_MODEL, "search_read", [[]], {"fields": ["id", "name"]})
+
+    def vehiculos_flota(self) -> list[dict]:
+        rows = self._call(FLEET_MODEL, "search_read", [[["active", "=", True]]],
+                          {"fields": ["id", "license_plate", "model_id"], "limit": 2000})
+        return [{"id": r["id"], "matricula": r.get("license_plate") or "",
+                 "modelo": (r.get("model_id") or [None, None])[1]} for r in rows]
 
     def _major(self) -> int:
         if self._major_cache is None:
