@@ -27,8 +27,8 @@ tests/              pruebas de la API Python      scripts/  diagnóstico, permis
 ## 1. Puesta en marcha (una sola vez)
 
 ### 1.1 Supabase
-1. Crea un proyecto en [supabase.com](https://supabase.com) en la **región de la UE** (Frankfurt o París).
-2. **SQL Editor** → pega el contenido de `supabase/migrations/20261102000000_base.sql` → **Run**.
+1. Proyecto **`app`** (región París, `eu-west-3`), URL `https://kcklgxmbojfpiwtsuibm.supabase.co`.
+2. Las migraciones de `supabase/migrations/` **ya están aplicadas** (tablas, permisos RLS y ajustes de seguridad; los avisos de seguridad de Supabase salen limpios). Cualquier cambio futuro: un archivo nuevo en esa carpeta, nunca editar uno aplicado.
 3. **Project Settings → API**: apunta la **URL**, la clave **publishable** (o *anon*) y la clave **secret** (o *service_role*). La secreta no se comparte nunca.
 4. **Authentication → URL Configuration**: en *Site URL* pon la dirección de la app (p. ej. `https://app.grupotrimodos.com`) y en *Redirect URLs* añade `https://app.grupotrimodos.com/auth/callback` y `http://localhost:3000/auth/callback`.
 
