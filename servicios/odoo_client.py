@@ -18,6 +18,8 @@ TASK_MODEL = "project.task"
 PACKAGE_MODEL = "tms.package"
 GOODS_MODEL = "tms.goods"
 ATTACHMENT_MODEL = "ir.attachment"
+ATTENDANCE_MODEL = "hr.attendance"   # fichajes
+LEAVE_MODEL = "hr.leave"             # ausencias
 
 TASK_FIELDS = ["name", "company_id", "stage_id", "is_transport_order", "tms_package_ids", "tms_transport_order_attachment_id"]
 PACKAGE_FIELDS = [
@@ -43,6 +45,10 @@ ALLOWED_CALLS = {
     ("ir.actions.report", "search_read"),   # solo vía find_report (diagnóstico)
     (PACKAGE_MODEL, "write"),        # solo vía write_package (campos EDITABLE_FIELDS)
     (TASK_MODEL, "message_post"),    # solo vía post_note
+    (ATTENDANCE_MODEL, "search_read"),  # solo vía asistencia_abierta
+    (ATTENDANCE_MODEL, "create"),       # solo vía abrir_asistencia (employee_id, check_in)
+    (ATTENDANCE_MODEL, "write"),        # solo vía cerrar_asistencia (check_out)
+    (LEAVE_MODEL, "create"),            # solo vía crear_ausencia
 }
 
 # Permisos que se comprueban sin ejecutar nada: (modelo, operación, ¿debería tenerlo el usuario técnico?)
@@ -54,6 +60,9 @@ EXPECTED_PERMISSIONS = [
     (GOODS_MODEL, "read", True), (GOODS_MODEL, "write", False),
     (ATTACHMENT_MODEL, "read", True),
     (ORDER_MODEL, "read", True), (ORDER_MODEL, "write", False), (ORDER_MODEL, "unlink", False),
+    (ATTENDANCE_MODEL, "read", True), (ATTENDANCE_MODEL, "create", True), (ATTENDANCE_MODEL, "write", True),
+    (ATTENDANCE_MODEL, "unlink", False),
+    (LEAVE_MODEL, "create", True), (LEAVE_MODEL, "unlink", False),
 ]
 ALLOWED_CALLS |= {(m, "check_access_rights") for m, _, _ in EXPECTED_PERMISSIONS}
 
@@ -133,6 +142,27 @@ class OdooClient:
         if not values or not set(values) <= EDITABLE_FIELDS:
             raise PermissionError("Campo no permitido")
         self._call(PACKAGE_MODEL, "write", [[int(package_id)], values])
+
+    # ---- fichajes (hr.attendance) y ausencias (hr.leave) ------------------------
+    # Fechas: Odoo guarda en UTC y por RPC las recibe como texto «AAAA-MM-DD HH:MM:SS».
+    def asistencia_abierta(self, empleado_id: int) -> dict | None:
+        rows = self._call(ATTENDANCE_MODEL, "search_read",
+                          [[["employee_id", "=", int(empleado_id)], ["check_out", "=", False]]],
+                          {"fields": ["id", "check_in"], "limit": 1, "order": "check_in desc"})
+        return rows[0] if rows else None
+
+    def abrir_asistencia(self, empleado_id: int, check_in: str) -> int:
+        return self._call(ATTENDANCE_MODEL, "create", [{"employee_id": int(empleado_id), "check_in": check_in}])
+
+    def cerrar_asistencia(self, asistencia_id: int, check_out: str) -> None:
+        self._call(ATTENDANCE_MODEL, "write", [[int(asistencia_id)], {"check_out": check_out}])
+
+    def crear_ausencia(self, empleado_id: int, tipo_id: int, desde: str, hasta: str, nombre: str) -> int:
+        """Solicitud de ausencia en Odoo (queda para validar allí según su flujo)."""
+        return self._call(LEAVE_MODEL, "create", [{
+            "employee_id": int(empleado_id), "holiday_status_id": int(tipo_id),
+            "request_date_from": desde, "request_date_to": hasta, "name": nombre[:120],
+        }])
 
     def _major(self) -> int:
         if self._major_cache is None:

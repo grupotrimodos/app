@@ -15,7 +15,7 @@ import hashlib
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 import httpx
 from fastapi import Header
@@ -34,9 +34,10 @@ class Usuario:
     id: str
     nombre: str
     modulos: tuple[str, ...]
+    token: str = field(default="", repr=False, compare=False)   # para leer/escribir en Supabase CON SUS permisos
 
 
-USUARIO_PRUEBA = Usuario(id="prueba", nombre="Usuario de prueba", modulos=("deca",))
+USUARIO_PRUEBA = Usuario(id="prueba", nombre="Usuario de prueba", modulos=("deca", "fichaje", "ausencias", "chofer"))
 
 
 def _supabase() -> tuple[str, str]:
@@ -95,8 +96,10 @@ def usuario_actual(token: str) -> Usuario:
     return u
 
 
-def requiere_modulo(modulo: str):
-    """Dependencia de FastAPI: exige sesión de la app general con acceso al módulo indicado."""
+def requiere_modulo(modulo: str | tuple[str, ...] | None):
+    """Dependencia de FastAPI: exige sesión de la app general, usuario activo y acceso al módulo (o a uno de ellos).
+    None: cualquier usuario activo; la ruta debe comprobar después qué puede hacer (p. ej. ser responsable)."""
+    alternativos = (modulo,) if isinstance(modulo, str) else modulo
 
     def dependencia(authorization: str = Header("")) -> Usuario:
         if not supabase_configurado():
@@ -107,9 +110,9 @@ def requiere_modulo(modulo: str):
         if not token:
             raise AppError("Tienes que iniciar sesión.", 401, "sin_sesion")
         u = usuario_actual(token)
-        if modulo not in u.modulos:
+        if alternativos is not None and not set(alternativos) & set(u.modulos):
             raise AppError("No tienes acceso a esta parte de la app. Avisa a la oficina.", 403, "sin_permiso")
-        return u
+        return replace(u, token=token)
 
     dependencia.modulo = modulo
     return dependencia

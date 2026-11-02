@@ -21,6 +21,8 @@ class MockOdoo:
     def __init__(self):
         self.pdfs = {}
         self.writes, self.notes, self.prints = [], [], []  # registro de lo que se "escribe", para los tests
+        self.asistencias: dict[int, dict] = {}   # id -> {employee_id, check_in, check_out}
+        self.ausencias: dict[int, dict] = {}
         self.tasks = {
             204067: {
                 "id": 204067, "name": "S2621473", "company_id": [7, "TRANSARGI S.L.U"], "stage_id": [7, "En desarrollo"],
@@ -102,6 +104,30 @@ class MockOdoo:
             pkg[k] = ([v, self.goods_name(v)] if v else False) if k == "goods_id" else v
         pkg["write_date"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.writes.append((package_id, dict(values)))
+
+    # ---- fichajes y ausencias
+    def asistencia_abierta(self, empleado_id):
+        abiertas = [{"id": i, "check_in": a["check_in"]} for i, a in self.asistencias.items()
+                    if a["employee_id"] == empleado_id and not a["check_out"]]
+        return max(abiertas, key=lambda a: a["check_in"]) if abiertas else None
+
+    def abrir_asistencia(self, empleado_id, check_in):
+        if self.asistencia_abierta(empleado_id):   # Odoo tampoco deja dos entradas abiertas
+            raise ValueError("Ya hay una entrada abierta")
+        i = 700000 + len(self.asistencias) + 1
+        self.asistencias[i] = {"employee_id": empleado_id, "check_in": check_in, "check_out": None}
+        return i
+
+    def cerrar_asistencia(self, asistencia_id, check_out):
+        a = self.asistencias[asistencia_id]
+        if check_out <= a["check_in"]:
+            raise ValueError("La salida no puede ser anterior a la entrada")
+        a["check_out"] = check_out
+
+    def crear_ausencia(self, empleado_id, tipo_id, desde, hasta, nombre):
+        i = 800000 + len(self.ausencias) + 1
+        self.ausencias[i] = {"employee_id": empleado_id, "tipo_id": tipo_id, "desde": desde, "hasta": hasta, "nombre": nombre}
+        return i
 
     def post_note(self, task_id, html_body):
         self.notes.append((task_id, html_body))

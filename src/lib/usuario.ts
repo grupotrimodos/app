@@ -24,3 +24,21 @@ export async function usuarioActual() {
     .maybeSingle<Perfil>();
   return { supabase, uid, perfil };
 }
+
+/** Usuario activo con el módulo indicado; si no, vuelve al inicio. */
+export async function conModulo(modulo: string) {
+  const r = await usuarioActual();
+  if (!r.perfil?.activo || !r.perfil.modulos.includes(modulo)) redirect("/");
+  return r as typeof r & { perfil: Perfil };
+}
+
+/** Centros en los que el usuario es responsable (todos si es administrador). */
+export async function centrosQueGestiono(supabase: Awaited<ReturnType<typeof usuarioActual>>["supabase"], uid: string, esAdmin: boolean) {
+  if (esAdmin) {
+    const { data } = await supabase.from("centros").select("id,nombre").order("nombre");
+    return (data ?? []) as { id: number; nombre: string }[];
+  }
+  const { data } = await supabase.from("usuario_centro_rol").select("centro_id, centros(id,nombre)")
+    .eq("usuario_id", uid).eq("rol", "responsable");
+  return ((data ?? []) as unknown as { centros: { id: number; nombre: string } }[]).map((r) => r.centros).filter(Boolean);
+}

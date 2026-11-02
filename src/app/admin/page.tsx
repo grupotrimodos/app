@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Cabecera from "../Cabecera";
 import { MODULOS, NOMBRE_ROL, ROLES, type Rol } from "@/lib/modulos";
 import { usuarioActual } from "@/lib/usuario";
-import { cambiarPin, crearCentro, crearUsuarioPin, guardarUsuario, quitarCentro } from "./acciones";
+import { cambiarPin, cambiarVehiculo, crearCentro, crearUsuarioPin, crearVehiculo, guardarUsuario, quitarCentro } from "./acciones";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administración · Grupo Trimodos" };
@@ -51,11 +51,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   if (!perfil?.es_admin || !perfil.activo) redirect("/");
   const { ok, error } = await searchParams;
 
-  const [{ data: usuarios }, { data: centros }] = await Promise.all([
+  const [{ data: usuarios }, { data: centros }, { data: vehiculos }] = await Promise.all([
     supabase.from("usuarios")
       .select("id,nombre,email,codigo,activo,es_admin,modulos,odoo_employee_id,usuario_centro_rol(centro_id,rol)")
       .order("nombre").returns<Fila[]>(),
     supabase.from("centros").select("id,nombre").order("nombre").returns<{ id: number; nombre: string }[]>(),
+    supabase.from("vehiculos").select("id,matricula,modelo,centro_id,activo").order("matricula")
+      .returns<{ id: number; matricula: string; modelo: string | null; centro_id: number | null; activo: boolean }[]>(),
   ]);
   const nombreCentro = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
 
@@ -142,7 +144,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               <ElegirCentroRol centros={centros ?? []} />
             </div>
             <label>Módulos</label>
-            <ElegirModulos marcados={["deca"]} />
+            <ElegirModulos marcados={["fichaje"]} />
             <button className="btn primario" style={{ marginTop: 14 }}>Crear usuario</button>
           </form>
         </section>
@@ -153,6 +155,41 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           <form action={crearCentro} className="fila-form">
             <div><label>Nuevo centro</label><input name="nombre" /></div>
             <button className="btn">Añadir centro</button>
+          </form>
+        </section>
+        <section className="panel">
+          <h2>Camiones (cabezas tractoras)</h2>
+          <p className="hint">Los chóferes eligen o confirman su camión de esta lista. El «id de Movildata» se rellenará al conectar su API.</p>
+          {(vehiculos ?? []).length > 0 && (
+            <table>
+              <thead><tr><th>Matrícula</th><th>Modelo</th><th>Centro</th><th>Activo</th></tr></thead>
+              <tbody>
+                {(vehiculos ?? []).map((v) => (
+                  <tr key={v.id}>
+                    <td><b>{v.matricula}</b></td><td>{v.modelo ?? "—"}</td><td>{v.centro_id ? nombreCentro.get(v.centro_id) : "—"}</td>
+                    <td>
+                      <form action={cambiarVehiculo} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input type="hidden" name="id" value={v.id} />
+                        <input type="checkbox" name="activo" defaultChecked={v.activo} aria-label="Activo" />
+                        <button className="btn pequeno">Guardar</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <form action={crearVehiculo} className="fila-form" style={{ marginTop: 12 }}>
+            <div><label>Matrícula</label><input name="matricula" required autoCapitalize="characters" /></div>
+            <div><label>Modelo</label><input name="modelo" /></div>
+            <div>
+              <label>Centro</label>
+              <select name="centro" defaultValue="">
+                <option value="">—</option>
+                {(centros ?? []).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <button className="btn">Añadir camión</button>
           </form>
         </section>
       </main>

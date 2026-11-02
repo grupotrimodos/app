@@ -109,3 +109,23 @@ export async function crearCentro(form: FormData) {
   revalidatePath("/admin");
   volver(`Centro «${nombre}» creado.`);
 }
+
+export async function crearVehiculo(form: FormData) {
+  const { supabase } = await exigirAdmin();
+  const matricula = String(form.get("matricula") ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  const modelo = String(form.get("modelo") ?? "").trim() || null;
+  const centro_id = Number(form.get("centro") || 0) || null;
+  if (!/^[A-Z0-9 -]{4,12}$/.test(matricula)) return volver("Revisa la matrícula.", "error");
+  const { error } = await supabase.from("vehiculos").insert({ matricula, modelo, centro_id });
+  if (error) return volver(error.code === "23505" ? "Esa matrícula ya existe." : "No se ha podido añadir el camión.", "error");
+  revalidatePath("/admin");
+  volver(`Camión ${matricula} añadido.`);
+}
+
+export async function cambiarVehiculo(form: FormData) {
+  const { supabase } = await exigirAdmin();
+  const { error } = await supabase.from("vehiculos").update({ activo: form.get("activo") === "on" }).eq("id", Number(form.get("id")));
+  if (error) return volver("No se ha podido guardar.", "error");
+  revalidatePath("/admin");
+  volver("Camión actualizado.");
+}

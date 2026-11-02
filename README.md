@@ -8,15 +8,20 @@ App interna para móvil y ordenador. Una sola web (Next.js) con login común y m
 | Base de datos y login | Supabase (PostgreSQL + Auth). Los permisos están en la base de datos (RLS) | `supabase/migrations/` |
 | **DECA** | El conductor corrige mercancía, bultos, euro palets y peso de la orden de transporte en Odoo y descarga el PDF | Pantallas: `public/deca/` · API: `servicios/` (Python) |
 | **ARGON** | Excel de Carburos → pedidos en Odoo. Lo llama n8n; no tiene pantallas | `servicios/argon/` |
+| **Fichaje** | Entrada, pausas y salida. Se guarda en Supabase (registro de jornada) y se envía a Odoo (Asistencias) | `src/app/fichaje/` · `servicios/rrhh.py` |
+| **Vacaciones y ausencias** | Pedir días; el responsable aprueba y se crea la solicitud en Odoo (Ausencias) | `src/app/ausencias/` · `servicios/rrhh.py` |
+| **Mi equipo** | Para responsables: quién ha fichado, ausencias por aprobar, correcciones de fichajes y camión de cada chófer | `src/app/equipo/` |
+| **Mi camión** | Chóferes: camión de hoy por la tarjeta del tacógrafo (Movildata), horas del día y empezar/terminar jornada (ficha a la vez) | `src/app/chofer/` · `servicios/chofer.py`, `servicios/movildata.py` |
 
 Todo se publica en **un solo proyecto de Vercel**: Next.js para las pantallas y una función Python (`api/index.py`) para DECA y ARGON.
 
 ```
-src/app/            páginas: inicio, login, admin; /api/sesion/token
+src/app/            páginas: inicio, login, admin, fichaje, ausencias, equipo, chofer; /api/sesion/token
 src/lib/            clientes de Supabase, módulos, PIN
 src/proxy.ts        renueva la sesión y manda al login a quien no la tenga
 public/deca/        PWA de DECA (HTML/JS sin framework, funciona sin cobertura)
-servicios/          API Python: DECA (main.py, service.py, odoo_client.py…) y ARGON (argon/)
+servicios/          API Python: DECA (main.py, service.py, odoo_client.py…), ARGON (argon/), fichaje y ausencias → Odoo
+                    (rrhh.py), Movildata (movildata.py, chofer.py); supa.py lee/escribe en Supabase con el token del usuario
 api/index.py        entrada de la función Python en Vercel
 supabase/migrations SQL de tablas, permisos y altas
 tests/              pruebas de la API Python      scripts/  diagnóstico, permisos de Odoo, prueba en navegador
@@ -104,7 +109,18 @@ npx tsc --noEmit && npx next build                         # web
 4. **RLS**: cada usuario solo puede leer su fila; solo un administrador puede cambiar usuarios, centros y roles. Aunque alguien manipule la web, la base de datos no lo permite.
 5. **DECA**: sus pantallas piden el token a `/api/sesion/token` y lo mandan a la API Python (`Authorization: Bearer`). La API lo valida con Supabase y exige usuario **activo** con el módulo **`deca`**. El **nombre del conductor queda en la nota** de la tarea de Odoo.
 
-## 4. DECA: reglas y lecciones (no redescubrir)
+## 4. Fichaje, ausencias y chóferes
+
+- **Supabase es el registro de jornada.** Los fichajes no se borran ni se editan: si alguien se equivoca, su responsable añade una **corrección** con su motivo (queda quién y cuándo). Uno mismo solo puede fichar «ahora» (la base de datos rechaza horas pasadas o futuras).
+- **Envío a Odoo:** tras cada fichaje la web llama a la API Python, que manda lo pendiente a `hr.attendance` (entrada/vuelta de pausa abren; pausa/salida cierran). Cada fichaje muestra si está en Odoo, pendiente o con error, y hay botón de reintentar. **`RRHH_DRY_RUN`** (por defecto `true`, independiente del `DRY_RUN` de DECA) marca «modo prueba» y no escribe nada en Odoo. Un registro ya enviado no se puede volver a enviar (lo impide la base de datos).
+- Si Odoo rechaza un fichaje (p. ej. una entrada de otro día sin cerrar), queda en error y los siguientes de esa persona esperan hasta arreglarlo en Odoo y reintentar; las correcciones con hora pasada que Odoo rechace se arreglan a mano allí y no frenan al resto.
+- Para que llegue a Odoo, cada persona necesita su **id de empleado de Odoo** (Administración → Editar).
+- **Ausencias:** al aprobarlas se crea la solicitud en `hr.leave` con el tipo de `ODOO_TIPOS_AUSENCIA` (JSON, p. ej. `{"vacaciones": 1, "asuntos_propios": 2, "medico": 3, "otro": 4}` con los ids de los tipos de ausencia de vuestro Odoo). En Odoo queda para validar según su flujo.
+- **Responsables:** el rol «Responsable» en un centro permite ver a las personas de ese centro, aprobar sus ausencias y corregir sus fichajes. Nadie aprueba ni corrige lo suyo.
+- **Movildata:** `MOVILDATA_MODE=mock` (por defecto) simula la tarjeta y los datos del día con los camiones dados de alta en Administración. El modo real se implementará con la documentación de su API (`servicios/movildata.py`); mientras, el chófer elige la matrícula a mano.
+- La web llama a la API Python con `VERCEL_URL` (o `APP_URL` si se define). Si el despliegue tiene *Vercel Authentication*, el envío a Odoo falla y queda pendiente para reintentar.
+
+## 5. DECA: reglas y lecciones (no redescubrir)
 - **Lista blanca en el cliente de Odoo** (`servicios/odoo_client.py`): solo se escriben `goods_id`, `number_of_packages`, `euro_pallet_qty` y `shipping_weight` de `tms.package`; nota solo en `project.task`; imprimir solo la orden de transporte. Hay tests que lo garantizan.
 - **`DRY_RUN=true`** hace todo menos escribir/publicar/imprimir. Producción v15 solo con el pedido de prueba S2621473 y con permiso expreso.
 - Editable solo en etapa «Nuevo» o «En desarrollo» (`EDITABLE_STAGES`); aviso de peso por MMA a partir de `PESO_AVISO_KG` (27.000).
@@ -113,7 +129,7 @@ npx tsc --noEmit && npx next build                         # web
 - Al cambiar archivos de `public/deca/`, **sube la versión de caché** en `public/deca/sw.js`.
 - La guía de conductores se edita en `GUIA_CONDUCTORES.md` y se genera con `python -X utf8 -m scripts.generar_guia` (un test falla si se queda desfasada).
 
-## 5. Añadir un módulo nuevo
+## 6. Añadir un módulo nuevo
 1. Añádelo a `MODULOS` en `src/lib/modulos.ts` (id, nombre, descripción, ruta).
 2. Pantallas en `src/app/<modulo>/` (o, como DECA, en `public/<modulo>/` si es una PWA aparte).
 3. Si tiene API Python: rutas `/api/<modulo>/...` en `servicios/`, protegidas con `requiere_modulo("<modulo>")`, y su *rewrite* en `next.config.ts`.

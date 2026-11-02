@@ -70,3 +70,24 @@ details > summary { cursor: pointer; color: var(--acento); font-weight: 700; }
   tr { border-bottom: 1px solid var(--borde); padding: 10px 0; }
   td { border: 0; padding: 4px 0; }
 }
+
+/* fichaje, equipo y chófer */
+.btn.grande { min-height: 72px; font-size: 20px; }
+.etiqueta.mal { color: var(--error); border-color: #6b2d2f; }
+.estado-jornada { text-align: center; border-top: 6px solid var(--borde); }
+.estado-jornada.trabajando { border-top-color: var(--ok); }
+.estado-jornada.pausa { border-top-color: var(--acento); }
+.estado-grande { font-size: 34px; font-weight: 800; margin: 0 0 6px; }
+.matricula { display: inline-block; font-size: 36px; font-weight: 800; letter-spacing: .06em; background: #fff; color: #121417;
+  border: 3px solid #121417; border-left: 22px solid #0b3fa8; border-radius: 8px; padding: 2px 16px; margin: 6px 0 10px; }
+.botones-fichar { display: grid; gap: 12px; margin-top: 16px; }
+.lista-fichajes { list-style: none; margin: 0; padding: 0; }
+.lista-fichajes li { padding: 10px 0; border-bottom: 1px solid var(--borde); }
+.lista-fichajes li:last-child { border-bottom: 0; }
+.cifras { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
+.cifras .panel { margin: 0; padding: 14px 16px; }
+.cifras b { display: block; font-size: 26px; }
+.cifras span { color: var(--suave); font-size: 14px; }
+.solicitud { border-top: 1px solid var(--borde); padding: 12px 0; }
+.solicitud:first-of-type { border-top: 0; }
+a.etiqueta { text-decoration: none; padding: 6px 12px; font-size: 15px; }

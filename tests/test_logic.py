@@ -455,16 +455,19 @@ def supabase(monkeypatch):
     auth._cache.clear()
 
 
-def test_todas_las_rutas_de_deca_exigen_sesion_salvo_health():
+def test_todas_las_rutas_exigen_sesion_salvo_health_y_argon():
     from servicios.main import app, require_usuario
     rutas = [r for r in app.routes if getattr(r, "path", "").startswith("/api/")]
-    assert len(rutas) >= 6
+    assert len(rutas) >= 9
     for r in rutas:
         if r.path.startswith("/api/argon/"):
             continue  # proceso ARGON: lo llama n8n con su propia clave (ARGON_CLAVE); se comprueba abajo
-        assert r.path.startswith("/api/deca/"), r.path
-        protegida = require_usuario in [d.call for d in r.dependant.dependencies]
+        assert r.path.split("/")[2] in ("deca", "rrhh", "chofer"), r.path
+        deps = [d.call for d in r.dependant.dependencies]
+        protegida = any(hasattr(d, "modulo") for d in deps)
         assert protegida == (r.path != "/api/deca/health"), r.path
+        if r.path.startswith("/api/deca/") and protegida:
+            assert require_usuario in deps, r.path
 
 
 def test_argon_exige_su_clave(monkeypatch):
