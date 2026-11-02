@@ -91,3 +91,12 @@ details > summary { cursor: pointer; color: var(--acento); font-weight: 700; }
 .solicitud { border-top: 1px solid var(--borde); padding: 12px 0; }
 .solicitud:first-of-type { border-top: 0; }
 a.etiqueta { text-decoration: none; padding: 6px 12px; font-size: 15px; }
+
+/* Editor de perfiles */
+.areas-permisos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.areas-permisos fieldset { border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; margin: 0; }
+.areas-permisos legend { color: var(--acento); font-weight: 600; padding: 0 6px; }
+.areas-permisos label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; font-weight: 400; }
+.areas-permisos input[type="checkbox"] { width: 22px; height: 22px; flex: none; margin-top: 1px; }
+details.perfil { border-top: 1px solid var(--borde); padding: 12px 0; }
+details.perfil summary { cursor: pointer; padding: 6px 0; }

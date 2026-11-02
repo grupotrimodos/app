@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { conModulo } from "@/lib/usuario";
+import { conPermiso } from "@/lib/usuario";
 import { estadoDe, inicioDia, SIGUIENTES, type Fichaje } from "@/lib/jornada";
 import { llamarPython } from "@/lib/python";
 
@@ -9,7 +9,7 @@ const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/fichaje?
 
 /** Fichar ahora. Se comprueba en el servidor que el paso tiene sentido (no se puede salir sin haber entrado). */
 export async function fichar(form: FormData) {
-  const { supabase, uid } = await conModulo("fichaje");
+  const { supabase, uid } = await conPermiso("fichaje.fichar");
   const tipo = String(form.get("tipo")) as Fichaje["tipo"];
   const { data } = await supabase.from("fichajes").select("tipo,momento").eq("usuario_id", uid)
     .gte("momento", inicioDia(1).toISOString()).order("momento");
@@ -23,7 +23,7 @@ export async function fichar(form: FormData) {
 }
 
 export async function reintentarOdoo() {
-  await conModulo("fichaje");
+  await conPermiso("fichaje.fichar", "chofer.usar");
   const r = await llamarPython<{ enviados: number; errores: number }>("/api/rrhh/fichajes/sincronizar", { method: "POST", body: {} });
   revalidatePath("/fichaje");
   volver(r && r.errores === 0 ? "Enviado a Odoo." : "Odoo sigue sin aceptarlo. Avisa a tu responsable.", r && r.errores === 0 ? "ok" : "error");

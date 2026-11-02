@@ -3,8 +3,8 @@
 La pantalla manda `Authorization: Bearer <access_token>` (el token de Supabase del usuario que ha iniciado sesión).
 Aquí se comprueba en dos pasos, sin claves de administrador:
   1. Supabase confirma que el token es válido (`/auth/v1/user`).
-  2. Con ese mismo token se lee su fila de `usuarios` (las reglas RLS solo le dejan ver la suya) y se exige
-     que esté activo y tenga el módulo pedido.
+  2. Con ese mismo token se lee su fila de `usuarios` (activo, superadmin) y sus permisos (`rpc/mis_permisos`, que
+     junta los de sus perfiles) y se exige que esté activo y tenga el permiso pedido (catálogo: src/lib/permisos.json).
 
 Sin Supabase configurado: en modo simulado se entra como «Usuario de prueba»; en modo real la API se niega a
 funcionar (falla cerrada, nunca abierta).
@@ -33,11 +33,18 @@ _cache: dict[str, tuple[float, "Usuario"]] = {}
 class Usuario:
     id: str
     nombre: str
-    modulos: tuple[str, ...]
+    permisos: tuple[str, ...]
+    es_admin: bool = False   # superadministrador: todos los permisos
     token: str = field(default="", repr=False, compare=False)   # para leer/escribir en Supabase CON SUS permisos
 
 
-USUARIO_PRUEBA = Usuario(id="prueba", nombre="Usuario de prueba", modulos=("deca", "fichaje", "ausencias", "chofer"))
+    def puede(self, *permisos: str) -> bool:
+        """¿Tiene alguno de estos permisos?"""
+        return self.es_admin or bool(set(permisos) & set(self.permisos))
+
+
+USUARIO_PRUEBA = Usuario(id="prueba", nombre="Usuario de prueba", es_admin=True,
+                         permisos=("deca.usar", "fichaje.fichar", "ausencias.pedir", "chofer.usar"))
 
 
 def _supabase() -> tuple[str, str]:
@@ -69,9 +76,14 @@ def _consultar(token: str) -> Usuario:
             if not uid:
                 raise AppError("Tu sesión ha caducado. Vuelve a entrar.", 401, "sin_sesion")
             p = http.get(f"{url}/rest/v1/usuarios", headers=cab,
-                         params={"id": f"eq.{uid}", "select": "nombre,activo,modulos"})
+                         params={"id": f"eq.{uid}", "select": "nombre,activo,es_admin"})
             p.raise_for_status()
             filas = p.json()
+            permisos: list = []
+            if filas and filas[0].get("activo"):
+                q = http.post(f"{url}/rest/v1/rpc/mis_permisos", headers=cab, json={})
+                q.raise_for_status()
+                permisos = q.json() or []
     except AppError:
         raise
     except Exception:
@@ -80,7 +92,7 @@ def _consultar(token: str) -> Usuario:
     if not filas or not filas[0].get("activo"):
         raise AppError("Tu usuario no está activo. Avisa a la oficina.", 403, "usuario_inactivo")
     f = filas[0]
-    return Usuario(id=uid, nombre=f.get("nombre") or "", modulos=tuple(f.get("modulos") or ()))
+    return Usuario(id=uid, nombre=f.get("nombre") or "", permisos=tuple(permisos), es_admin=bool(f.get("es_admin")))
 
 
 def usuario_actual(token: str) -> Usuario:
@@ -96,10 +108,10 @@ def usuario_actual(token: str) -> Usuario:
     return u
 
 
-def requiere_modulo(modulo: str | tuple[str, ...] | None):
-    """Dependencia de FastAPI: exige sesión de la app general, usuario activo y acceso al módulo (o a uno de ellos).
-    None: cualquier usuario activo; la ruta debe comprobar después qué puede hacer (p. ej. ser responsable)."""
-    alternativos = (modulo,) if isinstance(modulo, str) else modulo
+def requiere_permiso(permiso: str | tuple[str, ...] | None):
+    """Dependencia de FastAPI: exige sesión de la app general, usuario activo y el permiso (o uno de ellos).
+    None: cualquier usuario activo; la ruta debe comprobar después qué puede hacer (p. ej. aprobar ausencias)."""
+    alternativos = (permiso,) if isinstance(permiso, str) else permiso
 
     def dependencia(authorization: str = Header("")) -> Usuario:
         if not supabase_configurado():
@@ -110,9 +122,9 @@ def requiere_modulo(modulo: str | tuple[str, ...] | None):
         if not token:
             raise AppError("Tienes que iniciar sesión.", 401, "sin_sesion")
         u = usuario_actual(token)
-        if alternativos is not None and not set(alternativos) & set(u.modulos):
+        if alternativos is not None and not u.puede(*alternativos):
             raise AppError("No tienes acceso a esta parte de la app. Avisa a la oficina.", 403, "sin_permiso")
         return replace(u, token=token)
 
-    dependencia.modulo = modulo
+    dependencia.permiso = permiso
     return dependencia

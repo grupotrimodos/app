@@ -1,65 +1,99 @@
-import { redirect } from "next/navigation";
 import Cabecera from "../Cabecera";
-import { MODULOS, NOMBRE_ROL, ROLES, type Rol } from "@/lib/modulos";
-import { usuarioActual } from "@/lib/usuario";
-import { cambiarPin, cambiarVehiculo, crearCentro, crearUsuarioPin, crearVehiculo, guardarUsuario, quitarCentro } from "./acciones";
+import { AREAS } from "@/lib/permisos";
+import { conPermiso } from "@/lib/usuario";
+import {
+  asignarPerfil, borrarPerfil, cambiarPin, cambiarVehiculo, crearCentro, crearPerfil, crearUsuarioPin, crearVehiculo, guardarPerfil,
+  guardarUsuario, quitarPerfil,
+} from "./acciones";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administración · Grupo Trimodos" };
 
+type Centro = { id: number; nombre: string };
+type PerfilRol = { id: number; nombre: string; descripcion: string | null; permisos: string[]; todos_los_centros: boolean };
 type Fila = {
   id: string; nombre: string; email: string | null; codigo: string | null; activo: boolean; es_admin: boolean;
-  modulos: string[]; odoo_employee_id: number | null;
-  usuario_centro_rol: { centro_id: number; rol: Rol }[];
+  odoo_employee_id: number | null;
+  usuario_perfil: { id: number; perfil_id: number; centro_id: number | null }[];
 };
 
-function ElegirCentroRol({ centros }: { centros: { id: number; nombre: string }[] }) {
+function ElegirPerfilCentro({ perfiles, centros }: { perfiles: PerfilRol[]; centros: Centro[] }) {
   return (
     <>
       <div>
-        <label>Centro</label>
-        <select name="centro" defaultValue="">
+        <label>Perfil</label>
+        <select name="perfil" defaultValue="">
           <option value="">—</option>
-          {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          {perfiles.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </select>
       </div>
       <div>
-        <label>Rol en ese centro</label>
-        <select name="rol" defaultValue="">
-          <option value="">—</option>
-          {ROLES.map((r) => <option key={r} value={r}>{NOMBRE_ROL[r]}</option>)}
+        <label>Centro</label>
+        <select name="centro" defaultValue="">
+          <option value="">Sin centro</option>
+          {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
     </>
   );
 }
 
-function ElegirModulos({ marcados = [] }: { marcados?: string[] }) {
+/** Casillas de permisos agrupadas por área, sacadas del catálogo: una función nueva aparece aquí sola. */
+function ElegirPermisos({ marcados = [] }: { marcados?: string[] }) {
   return (
-    <div className="chips">
-      {MODULOS.map((m) => (
-        <label key={m.id}>
-          <input type="checkbox" name="modulos" value={m.id} defaultChecked={marcados.includes(m.id)} /> {m.nombre}
-        </label>
+    <div className="areas-permisos">
+      {AREAS.map((a) => (
+        <fieldset key={a.id}>
+          <legend>{a.nombre}</legend>
+          {a.permisos.map((p) => (
+            <label key={p.id}>
+              <input type="checkbox" name="permisos" value={p.id} defaultChecked={marcados.includes(p.id)} /> {p.nombre}
+            </label>
+          ))}
+        </fieldset>
       ))}
     </div>
   );
 }
 
-export default async function Admin({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, perfil } = await usuarioActual();
-  if (!perfil?.es_admin || !perfil.activo) redirect("/");
-  const { ok, error } = await searchParams;
+function CamposPerfil({ p }: { p?: PerfilRol }) {
+  return (
+    <>
+      <div className="fila-form">
+        <div><label>Nombre</label><input name="nombre" required defaultValue={p?.nombre} placeholder="Ej.: Jefe de tráfico" /></div>
+        <div><label>Descripción</label><input name="descripcion" defaultValue={p?.descripcion ?? ""} /></div>
+      </div>
+      <label style={{ marginTop: 12 }}>Qué puede ver y hacer</label>
+      <ElegirPermisos marcados={p?.permisos} />
+      <label className="chips" style={{ marginTop: 12 }}>
+        <span><input type="checkbox" name="todos_los_centros" defaultChecked={p?.todos_los_centros} /> Sus permisos sobre otras
+          personas (ver equipo, aprobar, corregir) valen en <b>todos los centros</b>, no solo en el suyo</span>
+      </label>
+    </>
+  );
+}
 
-  const [{ data: usuarios }, { data: centros }, { data: vehiculos }] = await Promise.all([
-    supabase.from("usuarios")
-      .select("id,nombre,email,codigo,activo,es_admin,modulos,odoo_employee_id,usuario_centro_rol(centro_id,rol)")
-      .order("nombre").returns<Fila[]>(),
-    supabase.from("centros").select("id,nombre").order("nombre").returns<{ id: number; nombre: string }[]>(),
+export default async function Admin({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
+  const { supabase, perfil, puede } = await conPermiso("admin.usuarios", "vehiculos.gestionar", "admin.sincronizacion");
+  const { ok, error } = await searchParams;
+  const gestionaUsuarios = puede("admin.usuarios");
+
+  const [{ data: usuarios }, { data: centros }, { data: perfiles }, { data: vehiculos }] = await Promise.all([
+    gestionaUsuarios
+      ? supabase.from("usuarios").select("id,nombre,email,codigo,activo,es_admin,odoo_employee_id,usuario_perfil(id,perfil_id,centro_id)")
+        .order("nombre").returns<Fila[]>()
+      : Promise.resolve({ data: [] as Fila[] }),
+    supabase.from("centros").select("id,nombre").order("nombre").returns<Centro[]>(),
+    supabase.from("perfiles").select("id,nombre,descripcion,permisos,todos_los_centros").order("nombre").returns<PerfilRol[]>(),
     supabase.from("vehiculos").select("id,matricula,modelo,centro_id,activo").order("matricula")
       .returns<{ id: number; matricula: string; modelo: string | null; centro_id: number | null; activo: boolean }[]>(),
   ]);
-  const nombreCentro = new Map((centros ?? []).map((c) => [c.id, c.nombre]));
+  const listaCentros = centros ?? [];
+  const listaPerfiles = perfiles ?? [];
+  const nombreCentro = new Map(listaCentros.map((c) => [c.id, c.nombre]));
+  const nombrePerfil = new Map(listaPerfiles.map((p) => [p.id, p.nombre]));
+  const usos = new Map<number, number>();
+  for (const u of usuarios ?? []) for (const a of u.usuario_perfil) usos.set(a.perfil_id, (usos.get(a.perfil_id) ?? 0) + 1);
 
   return (
     <>
@@ -69,50 +103,55 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         {ok && <p className="aviso" role="status">{ok}</p>}
         {error && <p className="error" role="alert">{error}</p>}
 
+        {gestionaUsuarios && <>
         <section className="panel">
           <h2>Usuarios ({usuarios?.length ?? 0})</h2>
-          <p className="hint">El personal de oficina aparece aquí al entrar por primera vez con Microsoft; actívale sus módulos.</p>
+          <p className="hint">El personal de oficina aparece aquí al entrar por primera vez con Microsoft: actívalo y asígnale uno o
+            varios perfiles. Lo que ve y puede hacer cada persona es la suma de sus perfiles.</p>
           <table>
-            <thead><tr><th>Usuario</th><th>Acceso</th><th>Centros</th><th>Editar</th></tr></thead>
+            <thead><tr><th>Usuario</th><th>Acceso</th><th>Perfiles</th><th>Editar</th></tr></thead>
             <tbody>
               {(usuarios ?? []).map((u) => (
                 <tr key={u.id}>
                   <td>
                     <b>{u.nombre || "(sin nombre)"}</b><br />
                     <span className={`etiqueta ${u.activo ? "ok" : ""}`}>{u.activo ? "Activo" : "Inactivo"}</span>{" "}
-                    {u.es_admin && <span className="etiqueta">Admin</span>}
+                    {u.es_admin && <span className="etiqueta">Superadministrador</span>}
                   </td>
                   <td>{u.codigo ? <>Código <b>{u.codigo}</b> + PIN</> : <>Microsoft<br /><span className="hint">{u.email}</span></>}</td>
                   <td>
-                    {u.usuario_centro_rol.length === 0 && <span className="hint">—</span>}
-                    {u.usuario_centro_rol.map((r) => (
-                      <form key={r.centro_id} action={quitarCentro} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <input type="hidden" name="id" value={u.id} />
-                        <input type="hidden" name="centro" value={r.centro_id} />
-                        <span>{nombreCentro.get(r.centro_id)} · {NOMBRE_ROL[r.rol]}</span>
-                        <button className="btn pequeno" aria-label="Quitar centro" title="Quitar">×</button>
+                    {u.usuario_perfil.length === 0 && <span className="hint">{u.es_admin ? "Todo" : "Ninguno"}</span>}
+                    {u.usuario_perfil.map((a) => (
+                      <form key={a.id} action={quitarPerfil} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input type="hidden" name="asignacion" value={a.id} />
+                        <span>{nombrePerfil.get(a.perfil_id)} · {a.centro_id ? nombreCentro.get(a.centro_id) : "sin centro"}</span>
+                        <button className="btn pequeno" aria-label="Quitar perfil" title="Quitar">×</button>
                       </form>
                     ))}
                   </td>
                   <td>
                     <details>
                       <summary>Editar</summary>
-                      <form action={guardarUsuario}>
+                      <form action={asignarPerfil} className="fila-form">
                         <input type="hidden" name="id" value={u.id} />
-                        <label>Nombre</label>
-                        <input name="nombre" defaultValue={u.nombre} />
-                        <label>Módulos</label>
-                        <ElegirModulos marcados={u.modulos} />
-                        <div className="chips" style={{ marginTop: 12 }}>
-                          <label><input type="checkbox" name="activo" defaultChecked={u.activo} /> Activo</label>
-                          <label><input type="checkbox" name="es_admin" defaultChecked={u.es_admin} /> Administrador</label>
-                        </div>
+                        <ElegirPerfilCentro perfiles={listaPerfiles} centros={listaCentros} />
+                        <button className="btn">Añadir perfil</button>
+                      </form>
+                      <form action={guardarUsuario} style={{ marginTop: 14 }}>
+                        <input type="hidden" name="id" value={u.id} />
                         <div className="fila-form">
-                          <ElegirCentroRol centros={centros ?? []} />
+                          <div><label>Nombre</label><input name="nombre" defaultValue={u.nombre} /></div>
                           <div>
                             <label>Id de empleado en Odoo</label>
-                            <input name="odoo_employee_id" inputMode="numeric" defaultValue={u.odoo_employee_id ?? ""} />
+                            <input name="odoo_employee_id" inputMode="numeric" defaultValue={u.odoo_employee_id ?? ""}
+                              placeholder="Se rellena solo al sincronizar" />
                           </div>
+                        </div>
+                        <div className="chips" style={{ marginTop: 12 }}>
+                          <label><input type="checkbox" name="activo" defaultChecked={u.activo} /> Activo</label>
+                          {perfil.es_admin && (
+                            <label><input type="checkbox" name="es_admin" defaultChecked={u.es_admin} /> Superadministrador (todo)</label>
+                          )}
                         </div>
                         <button className="btn primario" style={{ marginTop: 14 }}>Guardar</button>
                       </form>
@@ -141,22 +180,52 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               <div><label>Nombre</label><input name="nombre" required /></div>
               <div><label>Código</label><input name="codigo" required autoCapitalize="characters" /></div>
               <div><label>PIN (6 a 12 cifras)</label><input name="pin" type="password" inputMode="numeric" autoComplete="new-password" required /></div>
-              <ElegirCentroRol centros={centros ?? []} />
+              <ElegirPerfilCentro perfiles={listaPerfiles} centros={listaCentros} />
             </div>
-            <label>Módulos</label>
-            <ElegirModulos marcados={["fichaje"]} />
             <button className="btn primario" style={{ marginTop: 14 }}>Crear usuario</button>
           </form>
         </section>
 
         <section className="panel">
+          <h2>Perfiles ({listaPerfiles.length})</h2>
+          <p className="hint">Un perfil es un puesto (Chófer, Operario de almacén, Jefe de tráfico, RR. HH.…) con lo que puede ver y
+            hacer. Al cambiar un perfil, cambia para todas las personas que lo tienen.</p>
+          {listaPerfiles.map((p) => (
+            <details key={p.id} className="perfil">
+              <summary><b>{p.nombre}</b> <span className="hint">· {usos.get(p.id) ?? 0} personas · {p.permisos.length} permisos
+                {p.todos_los_centros && " · todos los centros"}</span></summary>
+              <form action={guardarPerfil}>
+                <input type="hidden" name="id" value={p.id} />
+                <CamposPerfil p={p} />
+                <button className="btn primario" style={{ marginTop: 14 }}>Guardar perfil</button>
+              </form>
+              <form action={borrarPerfil} className="chips" style={{ marginTop: 14, alignItems: "center" }}>
+                <input type="hidden" name="id" value={p.id} />
+                <label><input type="checkbox" name="confirmar" /> Sí, quiero borrarlo ({usos.get(p.id) ?? 0} personas lo perderán)</label>
+                <button className="btn pequeno">Borrar perfil</button>
+              </form>
+            </details>
+          ))}
+          <details className="perfil">
+            <summary><b>+ Nuevo perfil</b></summary>
+            <form action={crearPerfil}>
+              <CamposPerfil />
+              <button className="btn primario" style={{ marginTop: 14 }}>Crear perfil</button>
+            </form>
+          </details>
+        </section>
+
+        <section className="panel">
           <h2>Centros de trabajo</h2>
-          <p>{(centros ?? []).map((c) => c.nombre).join(" · ") || <span className="hint">Todavía no hay centros.</span>}</p>
+          <p>{listaCentros.map((c) => c.nombre).join(" · ") || <span className="hint">Todavía no hay centros.</span>}</p>
           <form action={crearCentro} className="fila-form">
             <div><label>Nuevo centro</label><input name="nombre" /></div>
             <button className="btn">Añadir centro</button>
           </form>
         </section>
+        </>}
+
+        {puede("vehiculos.gestionar") && (
         <section className="panel">
           <h2>Camiones (cabezas tractoras)</h2>
           <p className="hint">Los chóferes eligen o confirman su camión de esta lista. El «id de Movildata» se rellenará al conectar su API.</p>
@@ -186,12 +255,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               <label>Centro</label>
               <select name="centro" defaultValue="">
                 <option value="">—</option>
-                {(centros ?? []).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                {listaCentros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
             </div>
             <button className="btn">Añadir camión</button>
           </form>
         </section>
+        )}
       </main>
     </>
   );

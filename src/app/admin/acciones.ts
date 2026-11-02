@@ -2,37 +2,31 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { MODULOS, ROLES } from "@/lib/modulos";
+import { esPermiso } from "@/lib/permisos";
 import { CODIGO_RE, PIN_RE, correoDeCodigo } from "@/lib/pin";
+import { usuarioActual } from "@/lib/usuario";
 
-const IDS_MODULOS = new Set(MODULOS.map((m) => m.id));
-
-/** Cada acción vuelve a comprobar en el servidor que quien la lanza es administrador. */
-async function exigirAdmin() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const uid = data?.claims?.sub;
-  if (!uid) redirect("/login");
-  const { data: yo } = await supabase.from("usuarios").select("es_admin,activo").eq("id", uid).maybeSingle();
-  if (!yo?.es_admin || !yo.activo) throw new Error("No tienes permiso.");
-  return { supabase, uid };
+/** Cada acción vuelve a comprobar en el servidor el permiso de quien la lanza (y la base de datos lo exige otra vez). */
+async function exigir(permiso: string) {
+  const r = await usuarioActual();
+  if (!r.perfil?.activo || !r.puede(permiso)) throw new Error("No tienes permiso.");
+  return r as typeof r & { perfil: NonNullable<typeof r.perfil> };
 }
 
 const volver = (msg: string, tipo: "ok" | "error" = "ok") =>
   redirect(`/admin?${tipo}=${encodeURIComponent(msg)}`);
 
-function leerModulos(form: FormData) {
-  return form.getAll("modulos").map(String).filter((m) => IDS_MODULOS.has(m));
-}
+const numero = (v: FormDataEntryValue | null) => Number(v || 0) || null;
+
+// ------------------------------------------------------------------ usuarios
 
 export async function crearUsuarioPin(form: FormData) {
-  const { supabase } = await exigirAdmin();
+  const { supabase } = await exigir("admin.usuarios");
   const nombre = String(form.get("nombre") ?? "").trim();
   const codigo = String(form.get("codigo") ?? "").trim().toUpperCase();
   const pin = String(form.get("pin") ?? "");
-  const centro = Number(form.get("centro") || 0);
-  const rol = String(form.get("rol") ?? "");
+  const perfil = numero(form.get("perfil"));
+  const centro = numero(form.get("centro"));
   if (!nombre) return volver("Falta el nombre.", "error");
   if (!CODIGO_RE.test(codigo)) return volver("El código debe tener de 3 a 20 letras o números.", "error");
   if (!PIN_RE.test(pin)) return volver("El PIN debe tener de 6 a 12 cifras.", "error");
@@ -44,52 +38,52 @@ export async function crearUsuarioPin(form: FormData) {
   if (error || !data.user) {
     return volver(error?.message?.includes("already") ? `El código ${codigo} ya existe.` : "No se ha podido crear el usuario.", "error");
   }
-  const { error: e2 } = await supabase.from("usuarios")
-    .update({ nombre, codigo, modulos: leerModulos(form), activo: true }).eq("id", data.user.id);
+  const { error: e2 } = await supabase.from("usuarios").update({ nombre, codigo, activo: true }).eq("id", data.user.id);
   if (e2) return volver("Usuario creado, pero no se han guardado sus datos. Revísalo.", "error");
-  if (centro && (ROLES as readonly string[]).includes(rol)) {
-    await supabase.from("usuario_centro_rol").insert({ usuario_id: data.user.id, centro_id: centro, rol });
-  }
+  if (perfil) await supabase.from("usuario_perfil").insert({ usuario_id: data.user.id, perfil_id: perfil, centro_id: centro });
   revalidatePath("/admin");
   volver(`Usuario ${codigo} creado. Dale su código y su PIN.`);
 }
 
 export async function guardarUsuario(form: FormData) {
-  const { supabase, uid } = await exigirAdmin();
+  const { supabase, uid, perfil: yo } = await exigir("admin.usuarios");
   const id = String(form.get("id"));
   const cambios: Record<string, unknown> = {
     nombre: String(form.get("nombre") ?? "").trim(),
     activo: form.get("activo") === "on",
-    es_admin: form.get("es_admin") === "on",
-    modulos: leerModulos(form),
-    odoo_employee_id: Number(form.get("odoo_employee_id")) || null,
+    odoo_employee_id: numero(form.get("odoo_employee_id")),
   };
-  if (id === uid && (!cambios.activo || !cambios.es_admin)) {
-    return volver("No puedes quitarte a ti mismo el acceso de administrador.", "error");
+  // Solo un superadministrador nombra a otros (la base de datos también lo impide).
+  if (yo.es_admin) cambios.es_admin = form.get("es_admin") === "on";
+  if (id === uid && (!cambios.activo || (yo.es_admin && !cambios.es_admin))) {
+    return volver("No puedes quitarte a ti mismo el acceso.", "error");
   }
   const { error } = await supabase.from("usuarios").update(cambios).eq("id", id);
-  if (error) return volver("No se han podido guardar los cambios.", "error");
-
-  // Centro y rol: una fila por centro. Aquí se gestiona el centro principal elegido en el formulario.
-  const centro = Number(form.get("centro") || 0);
-  const rol = String(form.get("rol") ?? "");
-  if (centro && (ROLES as readonly string[]).includes(rol)) {
-    await supabase.from("usuario_centro_rol").upsert({ usuario_id: id, centro_id: centro, rol });
-  }
+  if (error) return volver("No se han podido guardar los cambios (a un superadministrador solo lo cambia otro).", "error");
   revalidatePath("/admin");
   volver("Cambios guardados.");
 }
 
-export async function quitarCentro(form: FormData) {
-  const { supabase } = await exigirAdmin();
-  await supabase.from("usuario_centro_rol").delete()
-    .eq("usuario_id", String(form.get("id"))).eq("centro_id", Number(form.get("centro")));
+export async function asignarPerfil(form: FormData) {
+  const { supabase } = await exigir("admin.usuarios");
+  const perfil = numero(form.get("perfil"));
+  if (!perfil) return volver("Elige un perfil.", "error");
+  const { error } = await supabase.from("usuario_perfil")
+    .insert({ usuario_id: String(form.get("id")), perfil_id: perfil, centro_id: numero(form.get("centro")) });
+  if (error) return volver(error.code === "23505" ? "Ya tiene ese perfil en ese centro." : "No se ha podido asignar el perfil.", "error");
   revalidatePath("/admin");
-  volver("Centro quitado.");
+  volver("Perfil asignado.");
+}
+
+export async function quitarPerfil(form: FormData) {
+  const { supabase } = await exigir("admin.usuarios");
+  await supabase.from("usuario_perfil").delete().eq("id", Number(form.get("asignacion")));
+  revalidatePath("/admin");
+  volver("Perfil quitado.");
 }
 
 export async function cambiarPin(form: FormData) {
-  const { supabase } = await exigirAdmin();
+  const { supabase } = await exigir("admin.usuarios");
   const id = String(form.get("id"));
   const pin = String(form.get("pin") ?? "");
   if (!PIN_RE.test(pin)) return volver("El PIN debe tener de 6 a 12 cifras.", "error");
@@ -100,8 +94,50 @@ export async function cambiarPin(form: FormData) {
   volver(`PIN de ${u.codigo} cambiado.`);
 }
 
+// ------------------------------------------------------------------ perfiles
+
+function leerPerfil(form: FormData) {
+  return {
+    nombre: String(form.get("nombre") ?? "").trim(),
+    descripcion: String(form.get("descripcion") ?? "").trim() || null,
+    permisos: [...new Set(form.getAll("permisos").map(String).filter(esPermiso))],
+    todos_los_centros: form.get("todos_los_centros") === "on",
+  };
+}
+
+export async function crearPerfil(form: FormData) {
+  const { supabase } = await exigir("admin.usuarios");
+  const datos = leerPerfil(form);
+  if (!datos.nombre) return volver("Ponle nombre al perfil.", "error");
+  const { error } = await supabase.from("perfiles").insert(datos);
+  if (error) return volver(error.code === "23505" ? "Ya hay un perfil con ese nombre." : "No se ha podido crear el perfil.", "error");
+  revalidatePath("/admin");
+  volver(`Perfil «${datos.nombre}» creado.`);
+}
+
+export async function guardarPerfil(form: FormData) {
+  const { supabase } = await exigir("admin.usuarios");
+  const datos = leerPerfil(form);
+  if (!datos.nombre) return volver("Ponle nombre al perfil.", "error");
+  const { error } = await supabase.from("perfiles").update(datos).eq("id", Number(form.get("id")));
+  if (error) return volver(error.code === "23505" ? "Ya hay un perfil con ese nombre." : "No se ha podido guardar el perfil.", "error");
+  revalidatePath("/admin");
+  volver(`Perfil «${datos.nombre}» guardado. Los cambios valen ya para todas las personas que lo tienen.`);
+}
+
+export async function borrarPerfil(form: FormData) {
+  const { supabase } = await exigir("admin.usuarios");
+  if (form.get("confirmar") !== "on") return volver("Marca la casilla para confirmar que quieres borrar el perfil.", "error");
+  const { error } = await supabase.from("perfiles").delete().eq("id", Number(form.get("id")));
+  if (error) return volver("No se ha podido borrar el perfil.", "error");
+  revalidatePath("/admin");
+  volver("Perfil borrado. Las personas que lo tenían lo han perdido.");
+}
+
+// ------------------------------------------------------------------ centros y camiones
+
 export async function crearCentro(form: FormData) {
-  const { supabase } = await exigirAdmin();
+  const { supabase } = await exigir("admin.usuarios");
   const nombre = String(form.get("nombre") ?? "").trim();
   if (!nombre) return volver("Falta el nombre del centro.", "error");
   const { error } = await supabase.from("centros").insert({ nombre });
@@ -111,10 +147,10 @@ export async function crearCentro(form: FormData) {
 }
 
 export async function crearVehiculo(form: FormData) {
-  const { supabase } = await exigirAdmin();
+  const { supabase } = await exigir("vehiculos.gestionar");
   const matricula = String(form.get("matricula") ?? "").trim().toUpperCase().replace(/\s+/g, " ");
   const modelo = String(form.get("modelo") ?? "").trim() || null;
-  const centro_id = Number(form.get("centro") || 0) || null;
+  const centro_id = numero(form.get("centro"));
   if (!/^[A-Z0-9 -]{4,12}$/.test(matricula)) return volver("Revisa la matrícula.", "error");
   const { error } = await supabase.from("vehiculos").insert({ matricula, modelo, centro_id });
   if (error) return volver(error.code === "23505" ? "Esa matrícula ya existe." : "No se ha podido añadir el camión.", "error");
@@ -123,7 +159,7 @@ export async function crearVehiculo(form: FormData) {
 }
 
 export async function cambiarVehiculo(form: FormData) {
-  const { supabase } = await exigirAdmin();
+  const { supabase } = await exigir("vehiculos.gestionar");
   const { error } = await supabase.from("vehiculos").update({ activo: form.get("activo") === "on" }).eq("id", Number(form.get("id")));
   if (error) return volver("No se ha podido guardar.", "error");
   revalidatePath("/admin");

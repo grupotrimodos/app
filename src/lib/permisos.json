@@ -1,0 +1,51 @@
+{
+  "_comentario": "Catálogo ÚNICO de áreas y permisos. Cada función nueva añade aquí su área y sus permisos: aparecen solos en el editor de perfiles y en el inicio. Quien tenga cualquier permiso de un área ve su tarjeta en el inicio. Los mismos identificadores se usan en la base de datos (RLS) y en la API Python (requiere_permiso).",
+  "areas": [
+    {
+      "id": "fichaje", "nombre": "Fichaje", "ruta": "/fichaje",
+      "descripcion": "Fichar la entrada, las pausas y la salida. Se anota en Odoo.",
+      "permisos": [
+        { "id": "fichaje.fichar", "nombre": "Fichar su propia jornada" }
+      ]
+    },
+    {
+      "id": "chofer", "nombre": "Mi camión", "ruta": "/chofer",
+      "descripcion": "Confirmar el camión de hoy (tarjeta del tacógrafo), ver sus horas y empezar o terminar la jornada.",
+      "permisos": [
+        { "id": "chofer.usar", "nombre": "Usar «Mi camión» (chóferes)" }
+      ]
+    },
+    {
+      "id": "ausencias", "nombre": "Vacaciones y ausencias", "ruta": "/ausencias",
+      "descripcion": "Pedir días y ver si están aprobados.",
+      "permisos": [
+        { "id": "ausencias.pedir", "nombre": "Pedir vacaciones y ausencias" }
+      ]
+    },
+    {
+      "id": "equipo", "nombre": "Mi equipo", "ruta": "/equipo",
+      "descripcion": "Quién ha fichado hoy, ausencias por aprobar y correcciones.",
+      "permisos": [
+        { "id": "equipo.ver", "nombre": "Ver a las personas de sus centros (estado, fichajes, ausencias, camión)" },
+        { "id": "ausencias.aprobar", "nombre": "Aprobar o rechazar ausencias de las personas de sus centros" },
+        { "id": "fichaje.corregir", "nombre": "Corregir fichajes de las personas de sus centros" }
+      ]
+    },
+    {
+      "id": "deca", "nombre": "DECA · Orden de transporte", "ruta": "/deca/",
+      "descripcion": "Corregir mercancía, bultos, euro palets y peso de la orden y descargar el PDF.",
+      "permisos": [
+        { "id": "deca.usar", "nombre": "Corregir órdenes de transporte (DECA)" }
+      ]
+    },
+    {
+      "id": "admin", "nombre": "Administración", "ruta": "/admin",
+      "descripcion": "Usuarios, perfiles, centros, camiones y sincronización con Odoo.",
+      "permisos": [
+        { "id": "admin.usuarios", "nombre": "Gestionar usuarios, perfiles y centros (puede dar cualquier permiso: solo para administración)" },
+        { "id": "vehiculos.gestionar", "nombre": "Dar de alta y de baja camiones" },
+        { "id": "admin.sincronizacion", "nombre": "Ver y lanzar la sincronización con Odoo" }
+      ]
+    }
+  ]
+}

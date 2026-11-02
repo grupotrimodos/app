@@ -4,13 +4,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from . import movildata, supa
-from .auth import Usuario, requiere_modulo
+from .auth import Usuario, requiere_permiso
 
 router = APIRouter(prefix="/api/chofer", tags=["chofer"])
 
 
 @router.get("/hoy")
-def hoy(u: Usuario = Depends(requiere_modulo("chofer"))):
+def hoy(u: Usuario = Depends(requiere_permiso("chofer.usar"))):
     vehiculos = supa.leer(u.token, "vehiculos", {"activo": "eq.true", "select": "id,matricula"}) if u.token else []
     return {
         "modo": movildata.modo(),

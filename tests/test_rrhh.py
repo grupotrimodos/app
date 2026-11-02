@@ -17,10 +17,9 @@ class SupabaseFalso:
         self.tokens = {"tok-ana": UID, "tok-jefa": JEFA}
         self.tablas = {
             "usuarios": [
-                {"id": UID, "nombre": "Ana", "activo": True, "modulos": ["fichaje", "ausencias", "chofer"], "odoo_employee_id": 41},
-                {"id": JEFA, "nombre": "Jefa", "activo": True, "modulos": ["fichaje"], "odoo_employee_id": 7, "es_admin": True},
+                {"id": UID, "nombre": "Ana", "activo": True, "permisos": ["fichaje.fichar", "ausencias.pedir", "chofer.usar"], "odoo_employee_id": 41},
+                {"id": JEFA, "nombre": "Jefa", "activo": True, "permisos": ["fichaje.fichar"], "odoo_employee_id": 7, "es_admin": True},
             ],
-            "usuario_centro_rol": [],
             "fichajes": [], "ausencias": [],
             "vehiculos": [{"id": 1, "matricula": "4521 LKM", "activo": True}, {"id": 2, "matricula": "7832 MHT", "activo": True}],
         }
@@ -44,6 +43,8 @@ class SupabaseFalso:
             return httpx.Response(401, json={})
         if req.url.path == "/auth/v1/user":
             return httpx.Response(200, json={"id": uid})
+        if req.url.path == "/rest/v1/rpc/mis_permisos":
+            return httpx.Response(200, json=next(f["permisos"] for f in self.tablas["usuarios"] if f["id"] == uid))
         tabla = req.url.path.rsplit("/", 1)[1]
         params = dict(req.url.params)
         filas = self.tablas[tabla]
@@ -169,7 +170,8 @@ def test_chofer_hoy_detecta_camion_de_la_flota_en_modo_simulado(entorno):
     r = c.get("/api/chofer/hoy", headers=ANA).json()
     assert r["simulado"] is True and r["tarjeta"]["matricula"] in ("4521 LKM", "7832 MHT")
     assert c.get("/api/chofer/hoy", headers=ANA).json()["tarjeta"] == r["tarjeta"]          # siempre el mismo para el mismo chófer
-    assert c.get("/api/chofer/hoy", headers={"Authorization": "Bearer tok-jefa"}).status_code == 403   # sin módulo chófer
+    sb.tablas["usuarios"][1]["es_admin"] = False
+    assert c.get("/api/chofer/hoy", headers={"Authorization": "Bearer tok-jefa"}).status_code == 403   # sin permiso de chófer
 
 
 def test_cliente_real_solo_permite_las_operaciones_de_rrhh_previstas():
@@ -197,7 +199,7 @@ def test_una_correccion_rechazada_por_odoo_no_frena_los_demas(entorno):
     assert [f["odoo_estado"] for f in sb.tablas["fichajes"]] == ["error", "enviado"]
 
 
-def test_ausencias_sin_modulo_ni_ser_responsable_no_entra(entorno):
+def test_ausencias_sin_permiso_no_entra(entorno):
     sb, odoo, c = entorno
     sb.tablas["usuarios"][1]["es_admin"] = False
     assert c.post("/api/rrhh/ausencias/1/sincronizar", headers={"Authorization": "Bearer tok-jefa"}).status_code == 403

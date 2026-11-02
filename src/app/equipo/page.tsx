@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Cabecera from "../Cabecera";
 import EstadoOdoo from "../EstadoOdoo";
-import { centrosQueGestiono, usuarioActual } from "@/lib/usuario";
-import { NOMBRE_ROL, type Rol } from "@/lib/modulos";
+import { centrosConPermiso, conPermiso } from "@/lib/usuario";
+import { permisosDe } from "@/lib/permisos";
 import {
   duracion, estadoDe, fecha, hora, hoyISO, inicioDia, jornadaEnCurso, minutosTrabajados, NOMBRE_AUSENCIA, NOMBRE_ESTADO, NOMBRE_TIPO,
   type Fichaje,
@@ -14,22 +14,30 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Mi equipo · Grupo Trimodos" };
 
 const NADIE = "00000000-0000-0000-0000-000000000000";
-type Miembro = { usuario_id: string; centro_id: number; rol: Rol; usuarios: { nombre: string; codigo: string | null; activo: boolean } };
+type Fila = { usuario_id: string; perfiles: { nombre: string }; usuarios: { nombre: string; codigo: string | null; activo: boolean } };
+type Miembro = { usuario_id: string; perfiles: string[]; usuarios: Fila["usuarios"] };
 type Ausencia = { id: number; usuario_id: string; tipo: string; desde: string; hasta: string; motivo: string | null; estado: string;
   odoo_estado: string; odoo_error: string | null };
 
 export default async function PaginaEquipo({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string; centro?: string }> }) {
-  const { supabase, uid, perfil } = await usuarioActual();
-  if (!perfil?.activo) redirect("/");
-  const centros = await centrosQueGestiono(supabase, uid, perfil.es_admin);
+  const { supabase, uid, perfil, puede, veArea } = await conPermiso(...permisosDe("equipo"));
+  const centros = await centrosConPermiso(supabase, uid, perfil.es_admin, permisosDe("equipo"));
   if (centros.length === 0) redirect("/");
+  const verEquipo = puede("equipo.ver"), aprobar = puede("ausencias.aprobar"), corregir = puede("fichaje.corregir");
   const { ok, error, centro } = await searchParams;
   const elegido = centros.find((c) => String(c.id) === centro) ?? centros[0];
 
-  const { data: m } = await supabase.from("usuario_centro_rol").select("usuario_id,centro_id,rol,usuarios(nombre,codigo,activo)")
+  // Personas con algún perfil en este centro (una persona puede tener varios perfiles).
+  const { data: m } = await supabase.from("usuario_perfil").select("usuario_id,perfiles(nombre),usuarios(nombre,codigo,activo)")
     .eq("centro_id", elegido.id);
-  const miembros = ((m ?? []) as unknown as Miembro[]).filter((x) => x.usuarios?.activo)
-    .sort((a, b) => a.usuarios.nombre.localeCompare(b.usuarios.nombre));
+  const porPersona = new Map<string, Miembro>();
+  for (const x of (m ?? []) as unknown as Fila[]) {
+    if (!x.usuarios?.activo) continue;
+    const y = porPersona.get(x.usuario_id) ?? { usuario_id: x.usuario_id, perfiles: [], usuarios: x.usuarios };
+    if (x.perfiles) y.perfiles.push(x.perfiles.nombre);
+    porPersona.set(x.usuario_id, y);
+  }
+  const miembros = [...porPersona.values()].sort((a, b) => (a.usuarios.nombre || "").localeCompare(b.usuarios.nombre || ""));
   const ids = miembros.map((x) => x.usuario_id);
   const hoy = hoyISO();
 
@@ -63,7 +71,7 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.email || ""} admin={perfil.es_admin} />
+      <Cabecera nombre={perfil.nombre || perfil.email || ""} admin={veArea("admin")} />
       <main className="contenido">
         <h1>Mi equipo · {elegido.nombre}</h1>
         {centros.length > 1 && (
@@ -76,6 +84,7 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
         {ok && <p className="aviso" role="status">{ok}</p>}
         {error && <p className="error" role="alert">{error}</p>}
 
+        {verEquipo && <>
         <div className="cifras">
           <div className="panel"><b>{cuenta.trabajando}</b><span>Trabajando</span></div>
           <div className="panel"><b>{cuenta.pausa}</b><span>En pausa</span></div>
@@ -91,12 +100,12 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
               <tbody>
                 {filas.map(({ x, estado, entrada, min, errores, ausenteHoy, camion }) => (
                   <tr key={x.usuario_id}>
-                    <td><b>{nombre.get(x.usuario_id)}</b><br /><span className="hint">{NOMBRE_ROL[x.rol]}</span></td>
+                    <td><b>{nombre.get(x.usuario_id)}</b><br /><span className="hint">{x.perfiles.join(" · ")}</span></td>
                     <td>
                       <span className={`etiqueta ${estado === "trabajando" ? "ok" : ""}`}>
                         {ausenteHoy ? NOMBRE_AUSENCIA[ausenteHoy.tipo] : NOMBRE_ESTADO[estado]}
                       </span>
-                      {errores && (
+                      {errores && corregir && (
                         <form action={reintentarOdoo} style={{ marginTop: 6 }}>
                           <input type="hidden" name="usuario_id" value={x.usuario_id} />
                           <span className="etiqueta mal">Error con Odoo</span> <button className="btn pequeno">Reintentar</button>
@@ -113,7 +122,9 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
           )}
         </section>
 
-        <section className="panel">
+        </>}
+
+        {aprobar && <section className="panel">
           <h2>Solicitudes de ausencia ({pendientes.length})</h2>
           {pendientes.length === 0 ? <p className="hint">No hay solicitudes pendientes.</p> : pendientes.map((a) => (
             <form key={a.id} action={resolverAusencia} className="solicitud">
@@ -139,9 +150,9 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
               </ul>
             </>
           )}
-        </section>
+        </section>}
 
-        <section className="panel">
+        {corregir && <section className="panel">
           <h2>Corregir un fichaje</h2>
           <p className="hint">Si alguien se olvidó de fichar o se equivocó. No se borra nada: se añade la corrección con su motivo.</p>
           <form action={corregirFichaje}>
@@ -161,7 +172,7 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
             <input id="nota" name="nota" required maxLength={300} placeholder="Ej.: se olvidó de fichar la salida" />
             <button className="btn primario" style={{ marginTop: 14 }}>Guardar corrección</button>
           </form>
-        </section>
+        </section>}
       </main>
     </>
   );

@@ -1,6 +1,6 @@
 import Cabecera from "../Cabecera";
 import EstadoOdoo from "../EstadoOdoo";
-import { conModulo } from "@/lib/usuario";
+import { conPermiso } from "@/lib/usuario";
 import { fecha, hoyISO, NOMBRE_AUSENCIA } from "@/lib/jornada";
 import { anularAusencia, pedirAusencia } from "./acciones";
 
@@ -17,7 +17,7 @@ type Ausencia = { id: number; tipo: string; desde: string; hasta: string; motivo
 const dias = (a: Ausencia) => Math.round((Date.parse(a.hasta) - Date.parse(a.desde)) / 86400000) + 1;
 
 export default async function PaginaAusencias({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, uid, perfil } = await conModulo("ausencias");
+  const { supabase, uid, perfil, veArea } = await conPermiso("ausencias.pedir");
   const { ok, error } = await searchParams;
   const { data } = await supabase.from("ausencias")
     .select("id,tipo,desde,hasta,motivo,estado,comentario,odoo_estado,odoo_error")
@@ -27,7 +27,7 @@ export default async function PaginaAusencias({ searchParams }: { searchParams: 
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={perfil.es_admin} />
+      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
       <main className="contenido estrecho">
         <h1>Vacaciones y ausencias</h1>
         {ok && <p className="aviso" role="status">{ok}</p>}

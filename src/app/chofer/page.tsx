@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Cabecera from "../Cabecera";
-import { conModulo } from "@/lib/usuario";
+import { conPermiso } from "@/lib/usuario";
 import { duracion, estadoDe, hora, inicioDia, jornadaEnCurso, minutosTrabajados, NOMBRE_ESTADO, type Fichaje } from "@/lib/jornada";
 import { llamarPython } from "@/lib/python";
 import { empezarConCamion, finalizarJornada } from "./acciones";
@@ -17,7 +17,7 @@ type Hoy = {
 const horasMin = (h: number) => duracion(Math.round(h * 60));
 
 export default async function PaginaChofer({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, uid, perfil } = await conModulo("chofer");
+  const { supabase, uid, perfil, veArea } = await conPermiso("chofer.usar");
   const { ok, error } = await searchParams;
   const [{ data: abierta }, { data: vehs }, { data: f }, movil] = await Promise.all([
     supabase.from("asignaciones").select("id,inicio,origen,vehiculos(matricula,modelo)").eq("usuario_id", uid).is("fin", null).maybeSingle(),
@@ -36,7 +36,7 @@ export default async function PaginaChofer({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={perfil.es_admin} />
+      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
       <main className="contenido estrecho">
         <h1>Mi camión</h1>
         {ok && <p className="aviso" role="status">{ok}</p>}

@@ -1,14 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { conModulo } from "@/lib/usuario";
+import { conPermiso } from "@/lib/usuario";
 import { hoyISO } from "@/lib/jornada";
 
 const TIPOS = ["vacaciones", "asuntos_propios", "medico", "otro"];
 const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/ausencias?${tipo}=${encodeURIComponent(msg)}`);
 
 export async function pedirAusencia(form: FormData) {
-  const { supabase } = await conModulo("ausencias");
+  const { supabase } = await conPermiso("ausencias.pedir");
   const tipo = String(form.get("tipo"));
   const desde = String(form.get("desde") ?? "");
   const hasta = String(form.get("hasta") ?? "") || desde;
@@ -24,7 +24,7 @@ export async function pedirAusencia(form: FormData) {
 }
 
 export async function anularAusencia(form: FormData) {
-  const { supabase, uid } = await conModulo("ausencias");
+  const { supabase, uid } = await conPermiso("ausencias.pedir");
   const { data, error } = await supabase.from("ausencias").update({ estado: "anulada" })
     .eq("id", Number(form.get("id"))).eq("usuario_id", uid).eq("estado", "pendiente").select("id");
   if (error || !data?.length) return volver("No se ha podido anular (puede que ya esté resuelta).", "error");

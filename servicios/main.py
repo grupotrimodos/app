@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import service
-from .auth import Usuario, requiere_modulo, supabase_configurado
+from .auth import Usuario, requiere_permiso, supabase_configurado
 from .config import get_settings
 from .errors import AppError
 from .mock_odoo import MockOdoo
@@ -31,8 +31,8 @@ def get_odoo():
     return _odoo
 
 
-# Todas las rutas de DECA (salvo /health) exigen la sesión de la app general con el módulo «deca».
-require_usuario = requiere_modulo("deca")
+# Todas las rutas de DECA (salvo /health) exigen la sesión de la app general con el permiso «deca.usar».
+require_usuario = requiere_permiso("deca.usar")
 access = [Depends(require_usuario)]
 Usuario_ = Depends(require_usuario)
 

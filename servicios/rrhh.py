@@ -15,13 +15,13 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from . import supa
-from .auth import Usuario, requiere_modulo
+from .auth import Usuario, requiere_permiso
 from .errors import AppError
 
 log = logging.getLogger("conductores")
 router = APIRouter(prefix="/api/rrhh", tags=["rrhh"])
-con_fichaje = requiere_modulo(("fichaje", "chofer"))
-sesion = requiere_modulo(None)   # ausencias: el interesado (módulo «ausencias») o su responsable; se comprueba en la ruta
+con_fichaje = requiere_permiso(("fichaje.fichar", "chofer.usar", "fichaje.corregir"))
+con_ausencias = requiere_permiso(("ausencias.pedir", "ausencias.aprobar"))
 
 
 def rrhh_dry_run() -> bool:
@@ -110,18 +110,11 @@ def _tipos_ausencia() -> dict:
         return {}
 
 
-def _es_responsable(u: Usuario) -> bool:
-    if supa.leer(u.token, "usuarios", {"id": f"eq.{u.id}", "es_admin": "eq.true", "select": "id"}):
-        return True
-    return bool(supa.leer(u.token, "usuario_centro_rol", {"usuario_id": f"eq.{u.id}", "rol": "eq.responsable", "select": "centro_id"}))
-
-
 @router.post("/ausencias/{ausencia_id}/sincronizar")
-def sincronizar_ausencia(ausencia_id: int, u: Usuario = Depends(sesion)):
+def sincronizar_ausencia(ausencia_id: int, u: Usuario = Depends(con_ausencias)):
+    # Las reglas de la base de datos (RLS) deciden qué ausencias puede ver y marcar: las suyas o las de su equipo.
     if not u.token:
         return {"estado": "no_aplica"}
-    if "ausencias" not in u.modulos and not _es_responsable(u):
-        raise AppError("No tienes acceso a esta parte de la app. Avisa a la oficina.", 403, "sin_permiso")
     filas = supa.leer(u.token, "ausencias", {"id": f"eq.{ausencia_id}",
                                               "select": "id,usuario_id,tipo,desde,hasta,motivo,estado,odoo_estado"})
     if not filas:

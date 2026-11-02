@@ -1,22 +1,16 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { centrosQueGestiono, usuarioActual } from "@/lib/usuario";
+import { conPermiso } from "@/lib/usuario";
 import { madridAInstante } from "@/lib/jornada";
 import { llamarPython } from "@/lib/python";
 
 const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/equipo?${tipo}=${encodeURIComponent(msg)}`);
 
-async function exigirResponsable() {
-  const r = await usuarioActual();
-  if (!r.perfil?.activo) redirect("/");
-  const centros = await centrosQueGestiono(r.supabase, r.uid, r.perfil.es_admin);
-  if (centros.length === 0) redirect("/");
-  return r;
-}
 
+// Cada acción exige su permiso; además, la base de datos solo deja actuar sobre personas de los centros propios.
 export async function resolverAusencia(form: FormData) {
-  const { supabase, uid } = await exigirResponsable();
+  const { supabase, uid } = await conPermiso("ausencias.aprobar");
   const id = Number(form.get("id"));
   const aprobar = form.get("decision") === "aprobar";
   const comentario = String(form.get("comentario") ?? "").trim().slice(0, 300) || null;
@@ -32,7 +26,7 @@ export async function resolverAusencia(form: FormData) {
 }
 
 export async function corregirFichaje(form: FormData) {
-  const { supabase, uid } = await exigirResponsable();
+  const { supabase, uid } = await conPermiso("fichaje.corregir");
   const usuario_id = String(form.get("usuario_id") ?? "");
   const tipo = String(form.get("tipo") ?? "");
   const nota = String(form.get("nota") ?? "").trim().slice(0, 300);
@@ -49,7 +43,7 @@ export async function corregirFichaje(form: FormData) {
 }
 
 export async function reintentarOdoo(form: FormData) {
-  await exigirResponsable();
+  await conPermiso("fichaje.corregir");
   const usuario_id = String(form.get("usuario_id") ?? "");
   const r = await llamarPython<{ errores: number }>("/api/rrhh/fichajes/sincronizar", { method: "POST", body: { usuario_id } });
   revalidatePath("/equipo");

@@ -1,6 +1,6 @@
 import Cabecera from "../Cabecera";
 import EstadoOdoo from "../EstadoOdoo";
-import { conModulo } from "@/lib/usuario";
+import { conPermiso } from "@/lib/usuario";
 import {
   BOTON_TIPO, duracion, estadoDe, fecha, hora, inicioDia, jornadaEnCurso, minutosTrabajados, NOMBRE_ESTADO, NOMBRE_TIPO, SIGUIENTES,
   type Fichaje,
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Fichaje · Grupo Trimodos" };
 
 export default async function PaginaFichaje({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, uid, perfil } = await conModulo("fichaje");
+  const { supabase, uid, perfil, veArea } = await conPermiso("fichaje.fichar");
   const { ok, error } = await searchParams;
   const { data } = await supabase.from("fichajes")
     .select("id,usuario_id,tipo,momento,origen,nota,odoo_estado,odoo_error")
@@ -33,7 +33,7 @@ export default async function PaginaFichaje({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={perfil.es_admin} />
+      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
       <main className="contenido estrecho">
         <h1>Fichaje</h1>
         {ok && <p className="aviso" role="status">{ok}</p>}

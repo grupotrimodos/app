@@ -434,6 +434,8 @@ class _SupabaseFalso:
         uid, fila = self.filas[token]
         if request.url.path == "/auth/v1/user":
             return httpx.Response(200, json={"id": uid})
+        if request.url.path == "/rest/v1/rpc/mis_permisos":
+            return httpx.Response(200, json=fila["permisos"])
         assert request.url.path == "/rest/v1/usuarios" and request.url.params["id"] == f"eq.{uid}"
         return httpx.Response(200, json=[fila] if fila else [])
 
@@ -442,9 +444,9 @@ class _SupabaseFalso:
 def supabase(monkeypatch):
     import servicios.auth as auth
     falso = _SupabaseFalso({
-        "tok-ok": ("u1", {"nombre": "Ana Conductora", "activo": True, "modulos": ["deca"]}),
-        "tok-sin-modulo": ("u2", {"nombre": "Luis", "activo": True, "modulos": []}),
-        "tok-inactivo": ("u3", {"nombre": "Eva", "activo": False, "modulos": ["deca"]}),
+        "tok-ok": ("u1", {"nombre": "Ana Conductora", "activo": True, "permisos": ["deca.usar"]}),
+        "tok-sin-modulo": ("u2", {"nombre": "Luis", "activo": True, "permisos": ["fichaje.fichar"]}),
+        "tok-inactivo": ("u3", {"nombre": "Eva", "activo": False, "permisos": ["deca.usar"]}),
         "tok-sin-fila": ("u4", None),
     })
     monkeypatch.setenv("SUPABASE_URL", "https://proyecto.supabase.co")
@@ -464,7 +466,7 @@ def test_todas_las_rutas_exigen_sesion_salvo_health_y_argon():
             continue  # proceso ARGON: lo llama n8n con su propia clave (ARGON_CLAVE); se comprueba abajo
         assert r.path.split("/")[2] in ("deca", "rrhh", "chofer"), r.path
         deps = [d.call for d in r.dependant.dependencies]
-        protegida = any(hasattr(d, "modulo") for d in deps)
+        protegida = any(hasattr(d, "permiso") for d in deps)
         assert protegida == (r.path != "/api/deca/health"), r.path
         if r.path.startswith("/api/deca/") and protegida:
             assert require_usuario in deps, r.path
@@ -506,7 +508,7 @@ def test_el_token_se_comprueba_una_vez_por_minuto(supabase):
     c = _cliente()
     for _ in range(3):
         assert c.post("/api/deca/login", headers={"Authorization": "Bearer tok-ok"}).status_code == 200
-    assert supabase.llamadas == 2          # /auth/v1/user + /rest/v1/usuarios, solo la primera vez
+    assert supabase.llamadas == 3          # /auth/v1/user + usuarios + rpc/mis_permisos, solo la primera vez
 
 
 def test_supabase_caido_responde_503_sin_dejar_pasar(monkeypatch, supabase):
