@@ -3,8 +3,8 @@ import { AREAS } from "@/lib/permisos";
 import { DOCUMENTOS_PERSONA } from "@/lib/seguridad";
 import { conPermiso } from "@/lib/usuario";
 import {
-  asignarPerfil, borrarPerfil, cambiarPin, cambiarVehiculo, crearCentro, crearPerfil, crearUsuarioPin, crearVehiculo, guardarPerfil,
-  guardarUsuario, quitarPerfil,
+  asignarPerfil, borrarPerfil, cambiarPin, cambiarVehiculo, configurarUsuario, crearCentro, crearPerfil, crearUsuarioPin, crearVehiculo,
+  guardarPerfil, guardarUsuario, quitarPerfil,
 } from "./acciones";
 
 export const dynamic = "force-dynamic";
@@ -18,20 +18,21 @@ type Fila = {
   usuario_perfil: { id: number; perfil_id: number; centro_id: number | null }[];
 };
 
-function ElegirPerfilCentro({ perfiles, centros }: { perfiles: PerfilRol[]; centros: Centro[] }) {
+/** Perfil y centro. Al dar de alta, los dos son obligatorios: sin centro, ningún responsable recibe sus solicitudes. */
+function ElegirPerfilCentro({ perfiles, centros, obligatorio = false }: { perfiles: PerfilRol[]; centros: Centro[]; obligatorio?: boolean }) {
   return (
     <>
       <div>
         <label>Perfil</label>
-        <select name="perfil" defaultValue="">
-          <option value="">—</option>
+        <select name="perfil" defaultValue="" required={obligatorio}>
+          <option value="" disabled={obligatorio}>{obligatorio ? "Elige…" : "—"}</option>
           {perfiles.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </select>
       </div>
       <div>
         <label>Centro</label>
-        <select name="centro" defaultValue="">
-          <option value="">Sin centro</option>
+        <select name="centro" defaultValue="" required={obligatorio}>
+          <option value="" disabled={obligatorio}>{obligatorio ? "Elige…" : "Sin centro (solo lo gestiona la administración)"}</option>
           {centros.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
@@ -100,6 +101,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
   const listaPerfiles = perfiles ?? [];
   const nombreCentro = new Map(listaCentros.map((c) => [c.id, c.nombre]));
   const nombrePerfil = new Map(listaPerfiles.map((p) => [p.id, p.nombre]));
+  // Sin ningún perfil no ven nada y nadie recibe lo que piden: van arriba, con un solo paso para dejarlos listos.
+  const porConfigurar = (usuarios ?? []).filter((u) => !u.es_admin && u.usuario_perfil.length === 0);
   const usos = new Map<number, number>();
   for (const u of usuarios ?? []) for (const a of u.usuario_perfil) usos.set(a.perfil_id, (usos.get(a.perfil_id) ?? 0) + 1);
 
@@ -119,6 +122,18 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         )}
 
         {gestionaUsuarios && <>
+        {porConfigurar.length > 0 && <section className="panel por-configurar" id="por-configurar">
+          <h2>Personas por configurar ({porConfigurar.length})</h2>
+          <p className="hint">No tienen perfil: no ven nada y lo que pidan no le llega a nadie. Elige su puesto y su centro y quedan activas.</p>
+          {porConfigurar.map((u) => <form key={u.id} action={configurarUsuario} className="fila-form configurar">
+            <input type="hidden" name="id" value={u.id} />
+            <div><b>{u.nombre || "(sin nombre)"}</b><div className="hint">{u.codigo ? `Código ${u.codigo} + PIN` : `Microsoft · ${u.email ?? ""}`}
+              {!u.activo && " · inactivo"}</div></div>
+            <ElegirPerfilCentro perfiles={listaPerfiles} centros={listaCentros} obligatorio />
+            <button className="btn primario">Activar con este perfil</button>
+          </form>)}
+        </section>}
+
         <section className="panel">
           <h2>Usuarios ({usuarios?.length ?? 0})</h2>
           <p className="hint">El personal de oficina aparece aquí al entrar por primera vez con Microsoft: actívalo y asígnale uno o
@@ -195,7 +210,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               <div><label>Nombre</label><input name="nombre" required /></div>
               <div><label>Código</label><input name="codigo" required autoCapitalize="characters" /></div>
               <div><label>PIN (6 a 12 cifras)</label><input name="pin" type="password" inputMode="numeric" autoComplete="new-password" required /></div>
-              <ElegirPerfilCentro perfiles={listaPerfiles} centros={listaCentros} />
+              <ElegirPerfilCentro perfiles={listaPerfiles} centros={listaCentros} obligatorio />
             </div>
             <button className="btn primario" style={{ marginTop: 14 }}>Crear usuario</button>
           </form>
@@ -203,6 +218,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
 
         <section className="panel">
           <h2>Perfiles ({listaPerfiles.length})</h2>
+          <div className="normas">
+            <b>Normas</b>
+            <ul>
+              <li>Cada persona tiene <b>un puesto</b> (Oficina, Chófer u Operario) <b>en su centro</b>.</li>
+              <li><b>Responsable</b> se añade encima del puesto: aprueba las vacaciones y la ropa y corrige los fichajes de las
+                personas de <b>su centro</b>. Sin responsable en un centro, lo resuelve la administración.</li>
+              <li><b>Seguridad</b> vale en todos los centros: caducidades, carretillas, inspecciones e incidencias.</li>
+              <li>Nadie aprueba lo suyo. Cada persona ve en su pantalla quién le aprueba, y a cada uno le llega lo suyo en la
+                campana de arriba («Pendientes»).</li>
+            </ul>
+          </div>
           <p className="hint">Un perfil es un puesto (Chófer, Operario de almacén, Jefe de tráfico, RR. HH.…) con lo que puede ver y
             hacer. Al cambiar un perfil, cambia para todas las personas que lo tienen.</p>
           {listaPerfiles.map((p) => (
@@ -243,7 +269,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         {puede("vehiculos.gestionar") && (
         <section className="panel">
           <h2>Camiones (cabezas tractoras)</h2>
-          <p className="hint">Los conductores eligen o confirman su camión de esta lista. El centro de flota consulta directamente los vehículos disponibles en Movildata.</p>
+          <p className="hint">Los conductores eligen o confirman su camión de esta lista. El centro de flota consulta directamente los vehículos disponibles en Movildata.
+            La ITV, el seguro y la revisión del tacógrafo de cada camión se apuntan en <a href="/seguridad?ver=vehiculos">Seguridad → Vehículos</a>.</p>
           {(vehiculos ?? []).length > 0 && (
             <table>
               <thead><tr><th>Matrícula</th><th>Modelo</th><th>Centro</th><th>Activo</th></tr></thead>

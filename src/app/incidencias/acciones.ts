@@ -27,5 +27,5 @@ export async function reportarIncidencia(form: FormData) {
   if (error) return volver("No se ha podido enviar. Inténtalo de nuevo.", "error");
   revalidatePath("/incidencias");
   revalidatePath("/seguridad");
-  volver("Incidencia enviada. Seguridad ya la tiene.");
+  volver("Incidencia enviada. La recibe el equipo de seguridad y la administración; aquí verás cuándo la cierran.");
 }

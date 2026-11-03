@@ -30,6 +30,8 @@ type Incidencia = {
   descripcion: string; estado: string; medidas: string | null;
 };
 
+const CAMPOS_INCIDENCIA = "id,reportado_por,ocurrio,tipo,gravedad,lugar,vehiculo_id,descripcion,estado,medidas";
+
 /** Orden de urgencia: primero lo caducado, luego lo que falta y lo que caduca pronto. */
 const PESO: Record<Caducidad, number> = { caducado: 0, falta: 1, pronto: 2, al_dia: 3 };
 
@@ -66,7 +68,7 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
   const ver = pestanas.find(([id]) => id === pedida)?.[0] ?? pestanas[0][0];
   const hoy = hoyISO();
 
-  const [vehiculosR, documentosR, usuariosR, perfilesR, equiposR, revisionesR, inspeccionesR, incidenciasR, centrosR] = await Promise.all([
+  const [vehiculosR, documentosR, usuariosR, perfilesR, equiposR, revisionesR, inspeccionesR, incidenciasR, cerradasR, centrosR] = await Promise.all([
     supabase.from("vehiculos").select("id,matricula,modelo").eq("activo", true).order("matricula").returns<Vehiculo[]>(),
     supabase.from("documentos").select("id,usuario_id,vehiculo_id,tipo,numero,caduca").returns<Documento[]>(),
     veTodo ? supabase.from("usuarios").select("id,nombre,email,codigo,activo").returns<Usuario[]>() : null,
@@ -74,8 +76,11 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
     veTodo ? supabase.from("equipos").select("id,tipo,nombre,marca_modelo,centro_id,proxima_revision,activo").order("tipo").order("nombre").returns<Equipo[]>() : null,
     veTodo ? supabase.from("equipo_revisiones").select("equipo_id,fecha,tipo,resultado").order("fecha", { ascending: false }).limit(300).returns<Revision[]>() : null,
     veTodo ? supabase.from("inspecciones").select("id,centro_id,lugar,fecha,resultado,deficiencias,proxima").order("fecha", { ascending: false }).limit(50).returns<Inspeccion[]>() : null,
-    veTodo ? supabase.from("incidencias").select("id,reportado_por,ocurrio,tipo,gravedad,lugar,vehiculo_id,descripcion,estado,medidas")
-      .order("creado", { ascending: false }).limit(100).returns<Incidencia[]>() : null,
+    // Todas las abiertas (ninguna se pierde por antigua) y las últimas cerradas.
+    veTodo ? supabase.from("incidencias").select(CAMPOS_INCIDENCIA).neq("estado", "cerrada")
+      .order("creado", { ascending: false }).limit(1000).returns<Incidencia[]>() : null,
+    veTodo ? supabase.from("incidencias").select(CAMPOS_INCIDENCIA).eq("estado", "cerrada")
+      .order("creado", { ascending: false }).limit(30).returns<Incidencia[]>() : null,
     supabase.from("centros").select("id,nombre").order("nombre").returns<{ id: number; nombre: string }[]>(),
   ]);
   const vehiculos = vehiculosR.data ?? [];
@@ -83,7 +88,7 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
   const usuarios = usuariosR?.data ?? [];
   const equipos = equiposR?.data ?? [];
   const inspecciones = inspeccionesR?.data ?? [];
-  const incidencias = incidenciasR?.data ?? [];
+  const incidencias = [...(incidenciasR?.data ?? []), ...(cerradasR?.data ?? [])];
   const centros = centrosR.data ?? [];
   const nombreCentro = new Map(centros.map((c) => [c.id, c.nombre]));
   const nombreUsuario = new Map(usuarios.map((u) => [u.id, u.nombre || u.email || u.codigo || "—"]));

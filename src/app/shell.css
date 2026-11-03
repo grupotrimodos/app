@@ -21,6 +21,10 @@
 .shell-user-name { font-size: 13px; font-weight: 600; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shell-logout { display: flex; align-items: center; gap: 8px; border: 0; border-left: 1px solid #e2e8ee; margin-left: 5px; padding: 10px 0 10px 19px; min-height: 44px; color: #617082; background: none; cursor: pointer; font-size: 13px; }
 .shell-logout:hover { color: #182737; }
+.shell-avisos { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: auto; border-radius: 10px; color: #617082; flex-shrink: 0; }
+.shell-avisos:hover { background: #f0f3f6; color: #182737; }
+.shell-avisos.con-avisos { color: #182737; }
+.shell-avisos-cuenta { position: absolute; top: 4px; right: 2px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: #fcda00; color: #182330; font-size: 11px; font-weight: 800; line-height: 19px; text-align: center; box-shadow: 0 0 0 2px white; }
 .shell-skip { position: fixed; top: -80px; left: 248px; z-index: 100; background: #fcda00; color: #142535; border-radius: 7px; padding: 12px 18px; font-weight: 700; }
 .shell-skip:focus { top: 16px; }
 .app-shell ~ .contenido { width: calc(100% - 232px); max-width: 1520px; margin-left: calc(232px + max(0px, (100% - 1752px) / 2)); margin-right: 0; }

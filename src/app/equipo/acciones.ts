@@ -21,12 +21,18 @@ export async function resolverAusencia(form: FormData) {
     .update({ estado: aprobar ? "aprobada" : "rechazada", resuelto_por: uid, resuelto_en: new Date().toISOString(), comentario })
     .eq("id", id).eq("estado", "pendiente").select("id");
   if (error || !data?.length) return volver("No se ha podido resolver (puede que ya esté resuelta o no sea de tu equipo).", "error");
+  let odoo = "";
   if (aprobar) {
-    await llamarPython(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });
+    const r = await llamarPython<{ estado: string }>(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });
     await apuntarAusenciaEnOutlook(id).catch(() => {});   // en su calendario, si está conectado
+    // Quien aprueba sabe si ya está en Odoo (si no, la sincronización automática lo reintenta).
+    odoo = { enviado: " Ya está en Odoo.", simulado: " Modo prueba: no se envía a Odoo.",
+      sin_empleado: " No ha llegado a Odoo: falta su ficha de empleado (lo arregla la administración).",
+      error: " Odoo no la ha aceptado todavía: se reintentará sola." }[r?.estado ?? "error"] ?? "";
   }
   revalidatePath("/equipo");
-  volver(aprobar ? "Ausencia aprobada." : "Ausencia rechazada.");
+  revalidatePath("/");
+  volver(aprobar ? `Ausencia aprobada.${odoo}` : "Ausencia rechazada.");
 }
 
 export async function corregirFichaje(form: FormData) {

@@ -11,10 +11,11 @@ import {
   NOMBRE_ESTADO, SIGUIENTES, type Fichaje,
 } from "@/lib/jornada";
 import { agendaDeHoy, calendarioActivo } from "@/lib/outlook";
+import { misPendientes } from "@/lib/pendientes";
 import { AREAS } from "@/lib/permisos";
 import { DOMINIO_PIN } from "@/lib/pin";
 import { llamarPythonDetalle } from "@/lib/python";
-import { CLASE_CADUCIDAD, DIAS_AVISO, fechaLarga, NOMBRE_CADUCIDAD, sumarDias } from "@/lib/seguridad";
+import { CLASE_CADUCIDAD, fechaLarga, NOMBRE_CADUCIDAD } from "@/lib/seguridad";
 import { usuarioActual } from "@/lib/usuario";
 
 export const dynamic = "force-dynamic";
@@ -97,10 +98,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const ayer = inicioDia(1);
   const hoy = hoyISO();
   // Cada indicador se pide solo si se tiene su permiso; la base de datos (RLS) decide además qué filas ve cada uno.
-  const veSeguridad = puede("seguridad.ver", "seguridad.gestionar");
-  const enAviso = sumarDias(hoy, DIAS_AVISO);
-  const [registro, solicitudes, proxima, camion, equipo, porAprobar, porActivar, fichajesMal, ausenciasMal, misDocs, caducan, incidencias,
-    ropaPendiente, ropaAprobada] = await Promise.all([
+  const [registro, solicitudes, proxima, camion, equipo, misDocs, { tareas }] = await Promise.all([
     puedeJornada ? supabase.from("fichajes").select("tipo,momento,odoo_estado,odoo_error").eq("usuario_id", uid)
       .gte("momento", new Date(Math.min(semana.getTime(), ayer.getTime())).toISOString()).order("momento") : null,
     puede("ausencias.pedir") ? supabase.from("ausencias").select("id", { count: "exact", head: true })
@@ -111,24 +109,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .maybeSingle<{ vehiculos: { matricula: string } | null }>() : null,
     puede("equipo.ver") ? supabase.from("fichajes").select("usuario_id,tipo").gte("momento", ayer.toISOString())
       .order("momento", { ascending: false }).limit(1000) : null,
-    puede("ausencias.aprobar") ? supabase.from("ausencias").select("id", { count: "exact", head: true })
-      .eq("estado", "pendiente").neq("usuario_id", uid) : null,
-    puede("admin.usuarios") ? supabase.from("usuarios").select("id", { count: "exact", head: true }).eq("activo", false) : null,
-    puede("admin.sincronizacion") ? supabase.from("fichajes").select("id", { count: "exact", head: true })
-      .in("odoo_estado", ["error", "sin_empleado"]) : null,
-    puede("admin.sincronizacion") ? supabase.from("ausencias").select("id", { count: "exact", head: true })
-      .in("odoo_estado", ["error", "sin_empleado"]) : null,
     esDeSuPuesto("documentos.propios") ? documentosDe(supabase, uid) : null,
-    // Caducidades: todas para seguridad; las de los camiones para quien los gestiona.
-    veSeguridad ? supabase.from("documentos").select("id", { count: "exact", head: true }).lte("caduca", enAviso)
-      : puede("vehiculos.gestionar") ? supabase.from("documentos").select("id", { count: "exact", head: true }).lte("caduca", enAviso)
-        .not("vehiculo_id", "is", null) : null,
-    veSeguridad ? supabase.from("incidencias").select("id", { count: "exact", head: true }).neq("estado", "cerrada") : null,
-    // Ropa del equipo: la base de datos solo cuenta la de las personas de sus centros.
-    puede("ropa.gestionar") ? supabase.from("solicitudes_ropa").select("id", { count: "exact", head: true })
-      .eq("estado", "pendiente").neq("usuario_id", uid) : null,
-    puede("ropa.gestionar") ? supabase.from("solicitudes_ropa").select("id", { count: "exact", head: true })
-      .eq("estado", "aprobada").neq("usuario_id", uid) : null,
+    // Lo que le toca resolver: el mismo cálculo que la campana y la página «Pendientes».
+    misPendientes(),
   ]);
 
   // Mi jornada: estado con las últimas 24 h (turnos de noche), horas de hoy y de la semana, y si ha llegado a Odoo.
@@ -158,37 +141,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       valor: equipo?.error ? "—" : String(tipos.filter((t) => t === "entrada" || t === "reanudar").length),
       detalle: enPausa ? `Y ${enPausa} en pausa` : "Nadie en pausa" });
   }
-  if (puede("ausencias.aprobar")) {
-    const n = cuenta(porAprobar);
-    indicadores.push({ href: "/equipo", icono: "calendario", titulo: "Ausencias por aprobar", valor: cifra(n),
-      detalle: "De las personas de tus centros", atencion: !!n });
-  }
-  if (ropaPendiente) {
-    const n = cuenta(ropaPendiente), m = cuenta(ropaAprobada);
-    indicadores.push({ href: "/ropa", icono: "ropa", titulo: "Ropa por aprobar", valor: cifra(n), atencion: !!n,
-      detalle: m ? `Y ${m} ${m === 1 ? "pedido aprobado" : "pedidos aprobados"} por entregar` : "De las personas de tus centros" });
-  }
-  if (puede("admin.usuarios")) {
-    const n = cuenta(porActivar);
-    indicadores.push({ href: "/admin", icono: "escudo", titulo: "Usuarios sin activar", valor: cifra(n),
-      detalle: n ? "Actívalos en Administración" : "Nadie esperando acceso", atencion: !!n });
-  }
-  if (puede("admin.sincronizacion")) {
-    const f = cuenta(fichajesMal), a = cuenta(ausenciasMal);
-    const n = f === null || a === null ? null : f + a;
-    indicadores.push({ href: "/admin/sincronizacion", icono: "actualizar", titulo: "Envíos a Odoo con error", valor: cifra(n),
-      detalle: n ? "Fichajes o ausencias sin llegar a Odoo" : "Todo enviado", atencion: !!n });
-  }
-  if (caducan) {
-    const n = cuenta(caducan);
-    indicadores.push({ href: veSeguridad ? "/seguridad" : "/seguridad?ver=vehiculos", icono: "documento",
-      titulo: veSeguridad ? "Caducidades" : "ITV y seguros", valor: cifra(n), atencion: !!n,
-      detalle: n ? `Vencidas o en los próximos ${DIAS_AVISO} días` : `Nada caduca en ${DIAS_AVISO} días` });
-  }
-  if (incidencias) {
-    const n = cuenta(incidencias);
-    indicadores.push({ href: "/seguridad?ver=incidencias", icono: "escudo", titulo: "Incidencias abiertas", valor: cifra(n),
-      detalle: n ? "Pendientes de cerrar" : "Ninguna abierta", atencion: !!n });
+  // Lo que tiene que resolver (su documentación va aparte, en el aviso amarillo).
+  for (const x of tareas.filter((x) => x.id !== "documentos")) {
+    indicadores.push({ href: x.href, icono: x.icono, titulo: x.titulo, valor: cifra(x.cantidad), detalle: x.detalle, atencion: !!x.cantidad });
   }
   if (puede("ausencias.pedir")) {
     const n = cuenta(solicitudes);

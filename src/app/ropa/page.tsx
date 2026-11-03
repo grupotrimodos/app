@@ -1,4 +1,5 @@
 import Cabecera from "../Cabecera";
+import QuienAprueba from "../QuienAprueba";
 import { fecha } from "@/lib/jornada";
 import { CLASE_ROPA, ESTADO_ROPA, MAX_UNIDADES, MOTIVOS_ROPA, PRENDAS, textoLinea, type LineaRopa } from "@/lib/ropa";
 import { conPermiso } from "@/lib/usuario";
@@ -80,6 +81,7 @@ export default async function Ropa({ searchParams }: { searchParams: Promise<{ o
 
       {pide && <section className="panel">
         <h2>Pedir ropa</h2>
+        <QuienAprueba permiso="ropa.gestionar" que="pedidos" />
         <form action={pedirRopa}>
           <p className="hint">Pon cuántas necesitas de cada prenda y su talla. Lo que dejes en 0 no se pide.</p>
           <div className="tabla-ropa">

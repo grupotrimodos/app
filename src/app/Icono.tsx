@@ -21,6 +21,7 @@ const trazos: Record<string, ReactNode> = {
   ruta: <><circle cx="5" cy="5" r="2" /><circle cx="19" cy="19" r="2" /><path d="M7 5h9a4 4 0 0 1 0 8H8a3 3 0 0 0 0 6h9" /></>,
   aviso: <><path d="m12 3 10 18H2zM12 9v5M12 17v.1" /></>,
   check: <path d="m5 12 4 4L19 6" />,
+  campana: <><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4" /></>,
   ropa: <path d="M8.5 3 3 6l2 5 2.5-1V21h9V10l2.5 1 2-5-5.5-3a3.5 3.5 0 0 1-7 0Z" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
 };

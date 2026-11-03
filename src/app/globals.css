@@ -123,6 +123,28 @@ details.perfil { border-top: 1px solid var(--borde); padding: 12px 0; }
 .texto-mal { color: var(--error); font-weight: 700; }
 .fila-form .crece { grid-column: 1 / -1; }
 .formulario-incidencia textarea { margin-bottom: 18px; }
+.quien-aprueba { font-size: 14px; color: var(--suave); background: #f3f6f9; border: 1px solid var(--borde); border-radius: 10px; padding: 10px 14px; margin: 0 0 16px; }
+.quien-aprueba b { color: var(--texto); }
+.odoo-motivo { display: block; margin-top: 4px; font-size: 13px; }
+
+.normas { background: #f3f6f9; border: 1px solid var(--borde); border-radius: 12px; padding: 14px 16px; margin: 0 0 16px; font-size: 14px; }
+.normas ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+
+/* Administración: personas por configurar */
+.por-configurar { border-color: #eee1a6; background: #fffdf2; }
+.por-configurar .configurar { padding: 12px 0; border-top: 1px solid #f0e6b8; }
+
+/* Pendientes: una fila por cosa que hacer, todo el renglón es el enlace */
+.lista-pendientes { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.lista-pendientes a { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 12px; color: var(--texto); text-decoration: none; }
+.lista-pendientes a:hover { border-color: #94a5b7; background: #f7f9fb; }
+.pendiente-icono { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: #eef3f7; color: #46617a; flex: none; }
+.pendiente-icono.bien { background: #edf8f2; color: var(--ok); }
+.pendiente-icono.mal { background: #fff0f1; color: var(--error); }
+.pendiente-texto { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.pendiente-texto .hint { font-size: 13px; }
+.pendiente-cuenta { min-width: 34px; padding: 3px 9px; border-radius: 9px; background: var(--acento); color: var(--sobre-acento); font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.quien-aprueba.sin-responsable { background: #fff9dd; border-color: #eee1a6; color: #6f5710; }
 
 /* Ropa de trabajo: una fila por prenda (nombre, talla, cuántas), cómoda con el dedo */
 .tabla-ropa { display: grid; gap: 8px; margin: 12px 0 4px; }

@@ -62,7 +62,7 @@ export default async function PaginaFichaje({ searchParams }: { searchParams: Pr
                   <b>{hora(f.momento)}</b> {NOMBRE_TIPO[f.tipo]}
                   {f.origen === "camion" && <span className="hint"> · al confirmar el camión</span>}
                   {f.origen === "correccion" && <span className="hint"> · corregido por tu responsable: {f.nota}</span>}
-                  <div><EstadoOdoo estado={f.odoo_estado} error={f.odoo_error} /></div>
+                  <div><EstadoOdoo estado={f.odoo_estado} error={f.odoo_error} detalle /></div>
                 </li>
               ))}
             </ul>

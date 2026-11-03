@@ -33,5 +33,7 @@ export async function reintentarOdoo(form: FormData) {
   revalidatePath("/");
   revalidatePath("/fichaje");
   const bien = r !== null && r.errores === 0 && !r.sin_empleado;
-  volver(pantalla(form), bien ? "Enviado a Odoo." : "Odoo sigue sin aceptarlo. Avisa a tu responsable.", bien ? "ok" : "error");
+  volver(pantalla(form), bien ? "Enviado a Odoo."
+    : r?.sin_empleado ? "Falta tu ficha de empleado en Odoo: avisa a la administración para que la enlace."
+    : "Odoo sigue sin aceptarlo. Avisa a tu responsable.", bien ? "ok" : "error");
 }

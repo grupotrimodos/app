@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AREAS } from "@/lib/permisos";
+import { misPendientes } from "@/lib/pendientes";
 import { usuarioActual } from "@/lib/usuario";
 import Icono from "./Icono";
 import Navegacion from "./Navegacion";
@@ -11,7 +12,7 @@ export default async function Cabecera({ nombre }: { nombre?: string; admin?: bo
       <span>Personas · Transporte · Logística</span>
     </header>;
   }
-  const { veArea } = await usuarioActual();
+  const [{ veArea }, { total }] = await Promise.all([usuarioActual(), misPendientes()]);
   const areas = AREAS.filter((a) => veArea(a.id)).map(({ id, nombre, ruta }) => ({ id, nombre, ruta }));
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "GT";
   return (
@@ -29,6 +30,10 @@ export default async function Cabecera({ nombre }: { nombre?: string; admin?: bo
       </aside>
       <header className="shell-header">
         <div className="shell-heading"><Icono nombre="actividad" size={20} /><span>Tu espacio Trimodos</span></div>
+        <Link className={`shell-avisos ${total ? "con-avisos" : ""}`} href="/pendientes"
+          aria-label={total ? `Pendientes: ${total}` : "Pendientes: nada"} title="Lo que tienes pendiente y tus novedades">
+          <Icono nombre="campana" size={21} />{total > 0 && <span className="shell-avisos-cuenta">{total > 99 ? "99+" : total}</span>}
+        </Link>
         <div className="shell-user">
           <span className="shell-avatar" aria-hidden="true">{iniciales}</span>
           <span className="shell-user-name">{nombre || "Mi cuenta"}</span>

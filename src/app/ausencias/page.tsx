@@ -1,5 +1,6 @@
 import Cabecera from "../Cabecera";
 import EstadoOdoo from "../EstadoOdoo";
+import QuienAprueba from "../QuienAprueba";
 import { conPermiso } from "@/lib/usuario";
 import { fecha, hoyISO, NOMBRE_AUSENCIA } from "@/lib/jornada";
 import { anularAusencia, pedirAusencia } from "./acciones";
@@ -30,6 +31,7 @@ export default async function PaginaAusencias({ searchParams }: { searchParams: 
       <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
       <main className="contenido estrecho">
         <h1>Vacaciones y ausencias</h1>
+        <QuienAprueba permiso="ausencias.aprobar" que="solicitudes" />
         {ok && <p className="aviso" role="status">{ok}</p>}
         {error && <p className="error" role="alert">{error}</p>}
 
