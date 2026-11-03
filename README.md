@@ -138,6 +138,8 @@ npx tsc --noEmit && npx next build                         # web
 - **Qué documentación pide cada puesto** se marca en **Administración → Perfiles** (`perfiles.documentos`). A cada persona se le pide en «Mi documentación» y se le avisa en su inicio de lo que falta o caduca en 30 días. Catálogo de tipos: `src/lib/seguridad.ts`.
 - Las **revisiones** de carretillas y las **inspecciones** son un registro: no se cambian ni se borran. Una revisión «fuera de servicio» deja el equipo fuera de servicio.
 - **Incidencias:** quien reporta ve las suyas; seguridad las ve todas y es la única que las cambia. Para cerrarlas hay que apuntar las medidas tomadas.
+- **Ropa de trabajo** (`/ropa`, catálogo en `src/lib/ropa.ts`): chóferes y operarios (`ropa.pedir`) piden prendas y EPIs con su talla; el responsable de su centro (`ropa.gestionar`, en el complemento Responsable) la aprueba o rechaza y la marca como entregada. Nadie resuelve lo suyo y las solicitudes no se borran.
+- **Centros reales:** oficinas de Grao de Castellón, Castellón de la Plana, Burriana y Sevilla; centros de montaje de Castellón, Burriana y Sevilla. Complementos que se suman al puesto: **Responsable** (su centro) y **Seguridad** (todos).
 - **Calendario de Outlook** (`src/lib/outlook.ts`): agenda de hoy en el inicio y ausencias aprobadas apuntadas en el Outlook de esa persona («fuera de la oficina»). El token de Microsoft se guarda **cifrado** (`microsoft_tokens`, sin acceso para ningún usuario, solo la clave de servidor). Activación: apartado 1.2.
 
 ## 5. Sincronización automática con Odoo

@@ -7,7 +7,7 @@ import Icono, { ICONOS_AREA } from "./Icono";
 type Enlace = { id: string; nombre: string; ruta: string };
 const nombres: Record<string, string> = { flota: "Centro de flota", ausencias: "Mis ausencias", deca: "Órdenes de transporte" };
 const orden: Record<string, number> = {
-  flota: 1, chofer: 2, deca: 3, fichaje: 4, ausencias: 5, documentos: 6, incidencias: 7, equipo: 8, seguridad: 9, admin: 10,
+  flota: 1, chofer: 2, deca: 3, fichaje: 4, ausencias: 5, ropa: 6, documentos: 7, incidencias: 8, equipo: 9, seguridad: 10, admin: 11,
 };
 
 export default function Navegacion({ areas }: { areas: Enlace[] }) {

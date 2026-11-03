@@ -26,12 +26,13 @@ const detalles: Record<string, { titulo: string; descripcion: string; etiqueta: 
   fichaje: { titulo: "Fichaje", descripcion: "Registra tu entrada, tus pausas y la salida. Todo queda anotado.", etiqueta: "MI JORNADA" },
   ausencias: { titulo: "Vacaciones y ausencias", descripcion: "Solicita tus días y sigue la respuesta de tu responsable.", etiqueta: "MI TIEMPO" },
   equipo: { titulo: "Mi equipo", descripcion: "Consulta la jornada de tu equipo y atiende sus solicitudes.", etiqueta: "PERSONAS" },
+  ropa: { titulo: "Ropa de trabajo", descripcion: "Pide ropa y EPIs; tu responsable la aprueba y te la entrega.", etiqueta: "EQUIPACIÓN" },
   documentos: { titulo: "Mi documentación", descripcion: "Carnés, certificados y reconocimientos al día, con aviso antes de que caduquen.", etiqueta: "MIS PAPELES" },
   incidencias: { titulo: "Incidencias", descripcion: "Avisa de un accidente, un incidente o una avería y sigue su estado.", etiqueta: "AVISAR" },
   seguridad: { titulo: "Seguridad", descripcion: "ITV, documentación, carretillas, inspecciones de almacén e incidencias.", etiqueta: "PREVENCIÓN" },
   admin: { titulo: "Administración", descripcion: "Gestiona los accesos, los centros, los vehículos y la sincronización.", etiqueta: "GESTIÓN" },
 };
-const orden = ["flota", "chofer", "deca", "fichaje", "ausencias", "documentos", "incidencias", "equipo", "seguridad", "admin"];
+const orden = ["flota", "chofer", "deca", "fichaje", "ausencias", "ropa", "documentos", "incidencias", "equipo", "seguridad", "admin"];
 
 type Indicador = { href: string; icono: string; titulo: string; valor: string; detalle: string; atencion?: boolean };
 
@@ -98,7 +99,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   // Cada indicador se pide solo si se tiene su permiso; la base de datos (RLS) decide además qué filas ve cada uno.
   const veSeguridad = puede("seguridad.ver", "seguridad.gestionar");
   const enAviso = sumarDias(hoy, DIAS_AVISO);
-  const [registro, solicitudes, proxima, camion, equipo, porAprobar, porActivar, fichajesMal, ausenciasMal, misDocs, caducan, incidencias] = await Promise.all([
+  const [registro, solicitudes, proxima, camion, equipo, porAprobar, porActivar, fichajesMal, ausenciasMal, misDocs, caducan, incidencias,
+    ropaPendiente, ropaAprobada] = await Promise.all([
     puedeJornada ? supabase.from("fichajes").select("tipo,momento,odoo_estado,odoo_error").eq("usuario_id", uid)
       .gte("momento", new Date(Math.min(semana.getTime(), ayer.getTime())).toISOString()).order("momento") : null,
     puede("ausencias.pedir") ? supabase.from("ausencias").select("id", { count: "exact", head: true })
@@ -122,6 +124,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       : puede("vehiculos.gestionar") ? supabase.from("documentos").select("id", { count: "exact", head: true }).lte("caduca", enAviso)
         .not("vehiculo_id", "is", null) : null,
     veSeguridad ? supabase.from("incidencias").select("id", { count: "exact", head: true }).neq("estado", "cerrada") : null,
+    // Ropa del equipo: la base de datos solo cuenta la de las personas de sus centros.
+    puede("ropa.gestionar") ? supabase.from("solicitudes_ropa").select("id", { count: "exact", head: true })
+      .eq("estado", "pendiente").neq("usuario_id", uid) : null,
+    puede("ropa.gestionar") ? supabase.from("solicitudes_ropa").select("id", { count: "exact", head: true })
+      .eq("estado", "aprobada").neq("usuario_id", uid) : null,
   ]);
 
   // Mi jornada: estado con las últimas 24 h (turnos de noche), horas de hoy y de la semana, y si ha llegado a Odoo.
@@ -155,6 +162,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     const n = cuenta(porAprobar);
     indicadores.push({ href: "/equipo", icono: "calendario", titulo: "Ausencias por aprobar", valor: cifra(n),
       detalle: "De las personas de tus centros", atencion: !!n });
+  }
+  if (ropaPendiente) {
+    const n = cuenta(ropaPendiente), m = cuenta(ropaAprobada);
+    indicadores.push({ href: "/ropa", icono: "ropa", titulo: "Ropa por aprobar", valor: cifra(n), atencion: !!n,
+      detalle: m ? `Y ${m} ${m === 1 ? "pedido aprobado" : "pedidos aprobados"} por entregar` : "De las personas de tus centros" });
   }
   if (puede("admin.usuarios")) {
     const n = cuenta(porActivar);

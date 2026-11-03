@@ -123,6 +123,16 @@ details.perfil { border-top: 1px solid var(--borde); padding: 12px 0; }
 .texto-mal { color: var(--error); font-weight: 700; }
 .fila-form .crece { grid-column: 1 / -1; }
 .formulario-incidencia textarea { margin-bottom: 18px; }
+
+/* Ropa de trabajo: una fila por prenda (nombre, talla, cuántas), cómoda con el dedo */
+.tabla-ropa { display: grid; gap: 8px; margin: 12px 0 4px; }
+.fila-ropa { display: grid; grid-template-columns: minmax(0, 1fr) 110px 76px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid #eef1f4; }
+.fila-ropa-nombre { font-weight: 600; min-width: 0; }
+.fila-ropa select { min-height: 48px; padding: 8px 10px; }
+.fila-ropa-unica { text-align: center; }
+.lista-ropa { margin: 6px 0; padding-left: 20px; }
+.lista-ropa li { padding: 1px 0; }
+@media (max-width: 420px) { .fila-ropa { grid-template-columns: minmax(0, 1fr) 92px 66px; } }
 .pagina-titulo { margin-bottom: 26px; }
 .pagina-titulo .eyebrow { display: block; margin-bottom: 9px; color: var(--suave); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .pagina-titulo h1 { margin-bottom: 9px; }

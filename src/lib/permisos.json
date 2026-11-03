@@ -46,6 +46,14 @@
       ]
     },
     {
+      "id": "ropa", "nombre": "Ropa de trabajo", "ruta": "/ropa",
+      "descripcion": "Pide ropa de trabajo y EPIs; tu responsable la aprueba y te la entrega.",
+      "permisos": [
+        { "id": "ropa.pedir", "nombre": "Pedir ropa de trabajo y EPIs para uno mismo" },
+        { "id": "ropa.gestionar", "nombre": "Aprobar y entregar la ropa que piden las personas de sus centros" }
+      ]
+    },
+    {
       "id": "incidencias", "nombre": "Incidencias", "ruta": "/incidencias",
       "descripcion": "Avisa de un accidente, un incidente o una avería y sigue en qué estado está.",
       "permisos": [
