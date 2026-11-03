@@ -14,6 +14,12 @@ export function inicioDia(dias = 0): Date {
   return madridAInstante(`${dia}T00:00`)!;
 }
 
+/** Lunes (hora de Madrid) de esta semana, como instante. */
+export function inicioSemana(): Date {
+  const diaSemana = new Date(`${hoyISO()}T12:00:00Z`).getUTCDay();   // 0 = domingo
+  return inicioDia((diaSemana + 6) % 7);
+}
+
 export const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString("es-ES", { timeZone: ZONA, hour: "2-digit", minute: "2-digit" });
 export const fecha = (iso: string | Date) =>
@@ -37,6 +43,21 @@ export function minutosTrabajados(fichajes: Fichaje[], ahora = new Date()): numb
   }
   if (desde !== null) total += ahora.getTime() - desde;
   return Math.max(0, Math.round(total / 60000));
+}
+
+/** Minutos trabajados en varios días, cada día por separado: una salida olvidada no alarga el total al día siguiente. */
+export function minutosPorDia(fichajes: Fichaje[], ahora = new Date()): number {
+  const dias = new Map<string, Fichaje[]>();
+  for (const f of fichajes) {
+    const d = new Date(f.momento).toLocaleDateString("sv-SE", { timeZone: ZONA });
+    dias.set(d, [...(dias.get(d) ?? []), f]);
+  }
+  let total = 0;
+  for (const [d, fs] of dias) {
+    const ultimo = fs.reduce((a, f) => (f.momento.localeCompare(a) > 0 ? f.momento : a), fs[0].momento);
+    total += minutosTrabajados(fs, d === hoyISO() ? ahora : new Date(ultimo));
+  }
+  return total;
 }
 
 export const duracion = (min: number) => `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min`;
