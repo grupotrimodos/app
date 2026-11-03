@@ -60,6 +60,16 @@
 .inicio-jornada-botones .btn:not(.primario):hover { background: #22394b; border-color: #6b8396; }
 .inicio-jornada-enlace { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font-size: 13px; font-weight: 600; color: #d7e1e9; text-decoration: none; }
 .inicio-jornada-enlace:hover { color: white; text-decoration: underline; }
+.inicio-avisos { background: #fffbea; border-color: #eee1a6; }
+.inicio-avisos h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 17px; color: #6f5710; }
+.inicio-avisos ul { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; }
+.inicio-avisos li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.inicio-agenda { margin-bottom: 30px; }
+.inicio-agenda h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 10px; font-size: 17px; }
+.inicio-agenda h2 svg { color: #46617a; }
+.inicio-agenda-lista { list-style: none; padding: 0; margin: 0; }
+.inicio-agenda-lista li { display: flex; gap: 14px; padding: 11px 0; border-top: 1px solid #eef1f4; font-size: 14px; }
+.inicio-agenda-hora { flex: none; width: 108px; color: var(--suave); font-variant-numeric: tabular-nums; }
 .inicio-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 36px; }
 .inicio-kpi { display: flex; flex-direction: column; gap: 6px; min-height: 132px; padding: 18px 20px; background: white; border: 1px solid #dfe6ec; border-radius: 13px; color: #182737; text-decoration: none; transition: border-color .18s, box-shadow .18s; }
 a.inicio-kpi:hover { border-color: #8fa5b9; box-shadow: 0 7px 21px #18273709; }

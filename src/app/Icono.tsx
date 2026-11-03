@@ -34,4 +34,5 @@ export default function Icono({ nombre, size = 22, className }: { nombre: string
 
 export const ICONOS_AREA: Record<string, string> = {
   flota: "flota", fichaje: "reloj", chofer: "camion", ausencias: "calendario", equipo: "equipo", deca: "documento", admin: "ajustes",
+  documentos: "documento", incidencias: "aviso", seguridad: "escudo",
 };

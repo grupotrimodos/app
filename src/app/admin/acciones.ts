@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esPermiso } from "@/lib/permisos";
+import { DOCUMENTOS_PERSONA } from "@/lib/seguridad";
 import { CODIGO_RE, DOMINIO_PIN, PIN_RE, correoDeCodigo } from "@/lib/pin";
 import { usuarioActual } from "@/lib/usuario";
 
@@ -108,6 +109,7 @@ function leerPerfil(form: FormData) {
     descripcion: String(form.get("descripcion") ?? "").trim() || null,
     permisos: [...new Set(form.getAll("permisos").map(String).filter(esPermiso))],
     todos_los_centros: form.get("todos_los_centros") === "on",
+    documentos: [...new Set(form.getAll("documentos").map(String).filter((d) => d in DOCUMENTOS_PERSONA))],
   };
 }
 

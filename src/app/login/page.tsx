@@ -1,6 +1,7 @@
 import Cabecera from "../Cabecera";
 import Icono from "../Icono";
 import FormularioLogin from "./FormularioLogin";
+import { ALCANCE_OUTLOOK, calendarioActivo } from "@/lib/outlook";
 
 export const metadata = { title: "Entrar · Grupo Trimodos" };
 
@@ -26,7 +27,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         <h2 id="titulo-acceso">Te damos la bienvenida.</h2>
         <p className="lead">Entra para continuar con tu jornada.</p>
         {error && <p className="error" role="alert">No se ha podido iniciar sesión. Inténtalo de nuevo.</p>}
-        <FormularioLogin destino={destino} />
+        <FormularioLogin destino={destino} alcance={calendarioActivo() ? ALCANCE_OUTLOOK : ""} />
         <p className="login-privado"><Icono nombre="escudo" size={16} />Espacio privado de Grupo Trimodos</p>
       </section>
     </main>

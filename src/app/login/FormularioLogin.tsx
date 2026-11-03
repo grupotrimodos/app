@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { CODIGO_RE, PIN_RE, correoDeCodigo } from "@/lib/pin";
 import Icono from "../Icono";
 
-export default function FormularioLogin({ destino }: { destino: string }) {
+/** `alcance`: lo que se pide a Microsoft además del correo (el calendario, solo si está activado en el servidor). */
+export default function FormularioLogin({ destino, alcance = "" }: { destino: string; alcance?: string }) {
   const [codigo, setCodigo] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +19,7 @@ export default function FormularioLogin({ destino }: { destino: string }) {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "azure",
-        options: { scopes: "email", redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(destino)}` },
+        options: { scopes: `email ${alcance}`.trim(), redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(destino)}` },
       });
       if (error) { setError("No se ha podido abrir el inicio de sesión de Microsoft. Inténtalo de nuevo."); setCargando(null); }
     } catch {

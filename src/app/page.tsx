@@ -4,13 +4,17 @@ import Cabecera from "./Cabecera";
 import EstadoOdoo from "./EstadoOdoo";
 import Icono, { ICONOS_AREA } from "./Icono";
 import { fichar, reintentarOdoo } from "./fichaje/acciones";
-import { requiereAtencion, type ResumenFlota } from "@/lib/flota";
+import { documentosDe } from "@/lib/documentos";
+import { numeroFlota, requiereAtencion, type ResumenFlota } from "@/lib/flota";
 import {
   BOTON_TIPO, duracion, estadoDe, fecha, hora, hoyISO, inicioDia, inicioSemana, jornadaEnCurso, minutosPorDia, minutosTrabajados,
   NOMBRE_ESTADO, SIGUIENTES, type Fichaje,
 } from "@/lib/jornada";
+import { agendaDeHoy, calendarioActivo } from "@/lib/outlook";
 import { AREAS } from "@/lib/permisos";
+import { DOMINIO_PIN } from "@/lib/pin";
 import { llamarPythonDetalle } from "@/lib/python";
+import { CLASE_CADUCIDAD, DIAS_AVISO, fechaLarga, NOMBRE_CADUCIDAD, sumarDias } from "@/lib/seguridad";
 import { usuarioActual } from "@/lib/usuario";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +26,12 @@ const detalles: Record<string, { titulo: string; descripcion: string; etiqueta: 
   fichaje: { titulo: "Fichaje", descripcion: "Registra tu entrada, tus pausas y la salida. Todo queda anotado.", etiqueta: "MI JORNADA" },
   ausencias: { titulo: "Vacaciones y ausencias", descripcion: "Solicita tus días y sigue la respuesta de tu responsable.", etiqueta: "MI TIEMPO" },
   equipo: { titulo: "Mi equipo", descripcion: "Consulta la jornada de tu equipo y atiende sus solicitudes.", etiqueta: "PERSONAS" },
+  documentos: { titulo: "Mi documentación", descripcion: "Carnés, certificados y reconocimientos al día, con aviso antes de que caduquen.", etiqueta: "MIS PAPELES" },
+  incidencias: { titulo: "Incidencias", descripcion: "Avisa de un accidente, un incidente o una avería y sigue su estado.", etiqueta: "AVISAR" },
+  seguridad: { titulo: "Seguridad", descripcion: "ITV, documentación, carretillas, inspecciones de almacén e incidencias.", etiqueta: "PREVENCIÓN" },
   admin: { titulo: "Administración", descripcion: "Gestiona los accesos, los centros, los vehículos y la sincronización.", etiqueta: "GESTIÓN" },
 };
-const orden = ["flota", "chofer", "deca", "fichaje", "ausencias", "equipo", "admin"];
+const orden = ["flota", "chofer", "deca", "fichaje", "ausencias", "documentos", "incidencias", "equipo", "seguridad", "admin"];
 
 type Indicador = { href: string; icono: string; titulo: string; valor: string; detalle: string; atencion?: boolean };
 
@@ -46,12 +53,33 @@ async function KpisFlota() {
   if (!datos) return <Kpi href="/flota" icono="flota" titulo="Flota" valor="—" detalle={error ?? "Movildata no responde."} atencion />;
   const enRuta = datos.vehiculos.filter((v) => v.estado === "en_ruta").length;
   const atencion = datos.vehiculos.filter(requiereAtencion).length;
+  const suma = (k: "km_hoy" | "consumo_hoy_litros") => {
+    const valores = datos.vehiculos.map((v) => v[k]).filter((n): n is number => n !== null && Number.isFinite(n));
+    return valores.length ? valores.reduce((a, b) => a + b, 0) : null;
+  };
+  const km = suma("km_hoy"), litros = suma("consumo_hoy_litros");
   return <>
     <Kpi href="/flota" icono="flota" titulo="En movimiento" valor={`${enRuta} de ${datos.vehiculos.length}`}
       detalle={datos.simulado ? "Vehículos de prueba" : "Vehículos de Movildata"} />
+    <Kpi href="/flota" icono="ruta" titulo="Kilómetros hoy" valor={km === null ? "—" : `${numeroFlota(km)} km`}
+      detalle={litros === null ? "Toda la flota" : `${numeroFlota(litros)} L de gasóleo`} />
     <Kpi href="/flota" icono="aviso" titulo="Requieren atención" valor={String(atencion)} atencion={atencion > 0}
       detalle={atencion ? "Señal antigua, poco combustible o avisos" : "Todo en orden"} />
   </>;
+}
+
+/** Agenda de hoy de su Outlook (se pide aparte: no frena el resto del inicio). */
+async function AgendaHoy({ uid }: { uid: string }) {
+  const citas = await agendaDeHoy(uid).catch(() => null);
+  return <section className="panel inicio-agenda" aria-labelledby="agenda-titulo">
+    <h2 id="agenda-titulo"><Icono nombre="calendario" size={20} />Mi agenda de hoy</h2>
+    {citas === null ? <p className="hint">Para ver aquí tu calendario de Outlook, sal y vuelve a entrar con Microsoft.</p>
+      : citas.length === 0 ? <p className="hint">Hoy no tienes nada en el calendario.</p>
+      : <ul className="inicio-agenda-lista">{citas.map((c, i) => <li key={i}>
+        <span className="inicio-agenda-hora">{c.todoElDia ? "Todo el día" : `${c.inicio.slice(11, 16)}–${c.fin.slice(11, 16)}`}</span>
+        <span><b>{c.asunto}</b>{c.lugar && <span className="hint"> · {c.lugar}</span>}</span>
+      </li>)}</ul>}
+  </section>;
 }
 
 /** Número de una consulta con `count`; null si no se ha podido leer. */
@@ -59,7 +87,7 @@ const cuenta = (r: { count: number | null; error: unknown } | null) => (!r || r.
 const cifra = (n: number | null) => (n === null ? "—" : String(n));
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { perfil, veArea, puede, supabase, uid } = await usuarioActual();
+  const { perfil, veArea, puede, esDeSuPuesto, supabase, uid } = await usuarioActual();
   const { ok, error } = await searchParams;
   const nombre = perfil?.nombre || perfil?.email || perfil?.codigo || "";
   const mias = AREAS.filter((a) => veArea(a.id)).sort((a, b) => orden.indexOf(a.id) - orden.indexOf(b.id));
@@ -68,7 +96,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const ayer = inicioDia(1);
   const hoy = hoyISO();
   // Cada indicador se pide solo si se tiene su permiso; la base de datos (RLS) decide además qué filas ve cada uno.
-  const [registro, solicitudes, proxima, camion, equipo, porAprobar, porActivar, fichajesMal, ausenciasMal] = await Promise.all([
+  const veSeguridad = puede("seguridad.ver", "seguridad.gestionar");
+  const enAviso = sumarDias(hoy, DIAS_AVISO);
+  const [registro, solicitudes, proxima, camion, equipo, porAprobar, porActivar, fichajesMal, ausenciasMal, misDocs, caducan, incidencias] = await Promise.all([
     puedeJornada ? supabase.from("fichajes").select("tipo,momento,odoo_estado,odoo_error").eq("usuario_id", uid)
       .gte("momento", new Date(Math.min(semana.getTime(), ayer.getTime())).toISOString()).order("momento") : null,
     puede("ausencias.pedir") ? supabase.from("ausencias").select("id", { count: "exact", head: true })
@@ -86,6 +116,12 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .in("odoo_estado", ["error", "sin_empleado"]) : null,
     puede("admin.sincronizacion") ? supabase.from("ausencias").select("id", { count: "exact", head: true })
       .in("odoo_estado", ["error", "sin_empleado"]) : null,
+    esDeSuPuesto("documentos.propios") ? documentosDe(supabase, uid) : null,
+    // Caducidades: todas para seguridad; las de los camiones para quien los gestiona.
+    veSeguridad ? supabase.from("documentos").select("id", { count: "exact", head: true }).lte("caduca", enAviso)
+      : puede("vehiculos.gestionar") ? supabase.from("documentos").select("id", { count: "exact", head: true }).lte("caduca", enAviso)
+        .not("vehiculo_id", "is", null) : null,
+    veSeguridad ? supabase.from("incidencias").select("id", { count: "exact", head: true }).neq("estado", "cerrada") : null,
   ]);
 
   // Mi jornada: estado con las últimas 24 h (turnos de noche), horas de hoy y de la semana, y si ha llegado a Odoo.
@@ -100,7 +136,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   // Indicadores: cada uno depende de un permiso, nunca de un perfil concreto.
   const indicadores: (Indicador | "flota")[] = [];
-  if (puede("chofer.usar")) {
+  if (esDeSuPuesto("chofer.usar")) {
     const matricula = camion?.data?.vehiculos?.matricula;
     indicadores.push({ href: "/chofer", icono: "camion", titulo: "Mi camión", valor: matricula ?? "Sin confirmar",
       detalle: matricula ? "Confirmado para tu jornada" : "Confírmalo al subir a la cabina" });
@@ -131,6 +167,17 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     indicadores.push({ href: "/admin/sincronizacion", icono: "actualizar", titulo: "Envíos a Odoo con error", valor: cifra(n),
       detalle: n ? "Fichajes o ausencias sin llegar a Odoo" : "Todo enviado", atencion: !!n });
   }
+  if (caducan) {
+    const n = cuenta(caducan);
+    indicadores.push({ href: veSeguridad ? "/seguridad" : "/seguridad?ver=vehiculos", icono: "documento",
+      titulo: veSeguridad ? "Caducidades" : "ITV y seguros", valor: cifra(n), atencion: !!n,
+      detalle: n ? `Vencidas o en los próximos ${DIAS_AVISO} días` : `Nada caduca en ${DIAS_AVISO} días` });
+  }
+  if (incidencias) {
+    const n = cuenta(incidencias);
+    indicadores.push({ href: "/seguridad?ver=incidencias", icono: "escudo", titulo: "Incidencias abiertas", valor: cifra(n),
+      detalle: n ? "Pendientes de cerrar" : "Ninguna abierta", atencion: !!n });
+  }
   if (puede("ausencias.pedir")) {
     const n = cuenta(solicitudes);
     indicadores.push({ href: "/ausencias", icono: "calendario", titulo: "Mis solicitudes", valor: cifra(n),
@@ -140,6 +187,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       valor: !p ? "Ninguna" : p.desde <= hoy ? "Ahora" : fecha(p.desde),
       detalle: !p ? "No tienes días aprobados" : p.desde === p.hasta ? "Aprobada" : `Aprobada, hasta el ${fecha(p.hasta)}` });
   }
+
+  const docsPendientes = misDocs?.situacion.filter((s) => s.estado !== "al_dia") ?? [];
+  const conAgenda = calendarioActivo() && !!perfil?.email && !perfil.email.endsWith(`@${DOMINIO_PIN}`);
 
   const ahora = new Date();
   const h = Number(ahora.toLocaleString("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", hourCycle: "h23" }));
@@ -164,6 +214,14 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       </section> : mias.length === 0 ? <section className="panel inicio-sin-acceso"><Icono nombre="equipo" size={36} />
         <h2>Tu espacio está listo</h2><p>Pide a la oficina que te asigne un perfil para ver las herramientas de tu puesto.</p>
       </section> : <>
+        {docsPendientes.length > 0 && <section className="panel inicio-avisos" aria-labelledby="avisos-titulo">
+          <h2 id="avisos-titulo"><Icono nombre="aviso" size={20} />Tienes documentación por poner al día</h2>
+          <ul>{docsPendientes.map((s) => <li key={s.tipo}>{s.nombre}{" "}
+            <span className={`etiqueta ${CLASE_CADUCIDAD[s.estado]}`}>{NOMBRE_CADUCIDAD[s.estado]}{s.doc?.caduca ? ` · ${fechaLarga(s.doc.caduca)}` : ""}</span>
+          </li>)}</ul>
+          <Link className="btn primario" href="/documentos">Completar mi documentación<Icono nombre="flecha" size={18} /></Link>
+        </section>}
+
         {puedeJornada && <section className="inicio-jornada" aria-labelledby="jornada-titulo">
           <div>
             <h2 id="jornada-titulo" className="inicio-jornada-titulo"><Icono nombre="reloj" size={18} />Mi jornada</h2>
@@ -189,11 +247,14 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
           </div>
         </section>}
 
+        {conAgenda && <Suspense fallback={<section className="panel inicio-agenda"><h2><Icono nombre="calendario" size={20} />Mi agenda de hoy</h2>
+          <p className="hint">Consultando Outlook…</p></section>}><AgendaHoy uid={uid} /></Suspense>}
+
         {indicadores.length > 0 && <>
           <div className="inicio-seccion-heading"><div><h2>Tus indicadores</h2><p>Lo importante de hoy, según tu puesto.</p></div></div>
           <div className="inicio-kpis">
             {indicadores.map((k) => k === "flota"
-              ? <Suspense key="flota" fallback={<><KpiCargando titulo="En movimiento" /><KpiCargando titulo="Requieren atención" /></>}><KpisFlota /></Suspense>
+              ? <Suspense key="flota" fallback={<><KpiCargando titulo="En movimiento" /><KpiCargando titulo="Kilómetros hoy" /><KpiCargando titulo="Requieren atención" /></>}><KpisFlota /></Suspense>
               : <Kpi key={k.titulo} {...k} />)}
           </div>
         </>}

@@ -77,6 +77,7 @@ tbody tr:hover { background: #fafbfc; }
 .etiqueta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--borde); color: var(--suave); background: #f5f7f9; }
 .etiqueta.ok { color: var(--ok); border-color: #cce6d9; background: #edf8f2; }
 .etiqueta.mal { color: var(--error); border-color: #f2c8ce; background: #fff0f1; }
+.etiqueta.pronto { color: #7a5d06; border-color: #eee1a6; background: #fff9dd; }
 a.etiqueta { text-decoration: none; min-height: 44px; padding: 8px 16px; font-size: 15px; }
 details > summary { cursor: pointer; color: #254d72; font-weight: 700; min-height: 44px; padding: 10px 0; }
 details[open] > summary { margin-bottom: 8px; }
@@ -104,6 +105,24 @@ details[open] > summary { margin-bottom: 8px; }
 .areas-permisos label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; font-weight: 400; }
 .areas-permisos input[type="checkbox"] { width: 22px; height: 22px; flex: none; margin-top: 1px; }
 details.perfil { border-top: 1px solid var(--borde); padding: 12px 0; }
+
+/* Seguridad, documentación e incidencias */
+.pestanas { display: flex; gap: 4px; overflow-x: auto; margin: 0 0 20px; border-bottom: 1px solid var(--borde); scrollbar-width: thin; }
+.pestanas a { flex: none; display: inline-flex; align-items: center; min-height: 46px; padding: 0 14px; margin-bottom: -1px; color: var(--suave);
+  font-weight: 600; font-size: 14px; text-decoration: none; border-bottom: 3px solid transparent; }
+.pestanas a:hover { color: var(--texto); }
+.pestanas a.activa { color: var(--texto); border-bottom-color: var(--acento); }
+.documento-cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; }
+.documento-cabecera h2 { margin: 0; font-size: 18px; }
+.documento-form { margin-top: 6px; }
+.lista-documentos, .lista-incidencias { list-style: none; padding: 0; margin: 0; }
+.lista-documentos li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid #eef1f4; }
+.lista-incidencias li { padding: 14px 0; border-bottom: 1px solid #eef1f4; }
+.lista-incidencias li > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lista-incidencias p { margin: 6px 0; }
+.texto-mal { color: var(--error); font-weight: 700; }
+.fila-form .crece { grid-column: 1 / -1; }
+.formulario-incidencia textarea { margin-bottom: 18px; }
 .pagina-titulo { margin-bottom: 26px; }
 .pagina-titulo .eyebrow { display: block; margin-bottom: 9px; color: var(--suave); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .pagina-titulo h1 { margin-bottom: 9px; }

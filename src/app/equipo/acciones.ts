@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { conPermiso } from "@/lib/usuario";
 import { madridAInstante } from "@/lib/jornada";
+import { apuntarAusenciaEnOutlook } from "@/lib/outlook";
 import { llamarPython } from "@/lib/python";
 
 const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/equipo?${tipo}=${encodeURIComponent(msg)}`);
@@ -20,7 +21,10 @@ export async function resolverAusencia(form: FormData) {
     .update({ estado: aprobar ? "aprobada" : "rechazada", resuelto_por: uid, resuelto_en: new Date().toISOString(), comentario })
     .eq("id", id).eq("estado", "pendiente").select("id");
   if (error || !data?.length) return volver("No se ha podido resolver (puede que ya esté resuelta o no sea de tu equipo).", "error");
-  if (aprobar) await llamarPython(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });
+  if (aprobar) {
+    await llamarPython(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });
+    await apuntarAusenciaEnOutlook(id).catch(() => {});   // en su calendario, si está conectado
+  }
   revalidatePath("/equipo");
   volver(aprobar ? "Ausencia aprobada." : "Ausencia rechazada.");
 }

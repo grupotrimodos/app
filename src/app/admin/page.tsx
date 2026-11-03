@@ -1,5 +1,6 @@
 import Cabecera from "../Cabecera";
 import { AREAS } from "@/lib/permisos";
+import { DOCUMENTOS_PERSONA } from "@/lib/seguridad";
 import { conPermiso } from "@/lib/usuario";
 import {
   asignarPerfil, borrarPerfil, cambiarPin, cambiarVehiculo, crearCentro, crearPerfil, crearUsuarioPin, crearVehiculo, guardarPerfil,
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Administración · Grupo Trimodos" };
 
 type Centro = { id: number; nombre: string };
-type PerfilRol = { id: number; nombre: string; descripcion: string | null; permisos: string[]; todos_los_centros: boolean };
+type PerfilRol = { id: number; nombre: string; descripcion: string | null; permisos: string[]; todos_los_centros: boolean; documentos: string[] };
 type Fila = {
   id: string; nombre: string; email: string | null; codigo: string | null; activo: boolean; es_admin: boolean;
   odoo_employee_id: number | null;
@@ -65,6 +66,13 @@ function CamposPerfil({ p }: { p?: PerfilRol }) {
       </div>
       <label style={{ marginTop: 12 }}>Qué puede ver y hacer</label>
       <ElegirPermisos marcados={p?.permisos} />
+      <div className="areas-permisos" style={{ marginTop: 12 }}><fieldset>
+        <legend>Documentación que pide este puesto</legend>
+        {Object.entries(DOCUMENTOS_PERSONA).map(([id, nombre]) => (
+          <label key={id}><input type="checkbox" name="documentos" value={id} defaultChecked={p?.documentos.includes(id)} /> {nombre}</label>
+        ))}
+        <span className="hint">A quien tenga este perfil se le pedirá en «Mi documentación» y se le avisará en su inicio.</span>
+      </fieldset></div>
       <label className="chips" style={{ marginTop: 12 }}>
         <span><input type="checkbox" name="todos_los_centros" defaultChecked={p?.todos_los_centros} /> Sus permisos sobre otras
           personas (ver equipo, aprobar, corregir) valen en <b>todos los centros</b>, no solo en el suyo</span>
@@ -84,7 +92,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         .order("nombre").returns<Fila[]>()
       : Promise.resolve({ data: [] as Fila[] }),
     supabase.from("centros").select("id,nombre").order("nombre").returns<Centro[]>(),
-    supabase.from("perfiles").select("id,nombre,descripcion,permisos,todos_los_centros").order("nombre").returns<PerfilRol[]>(),
+    supabase.from("perfiles").select("id,nombre,descripcion,permisos,todos_los_centros,documentos").order("nombre").returns<PerfilRol[]>(),
     supabase.from("vehiculos").select("id,matricula,modelo,centro_id,activo").order("matricula")
       .returns<{ id: number; matricula: string; modelo: string | null; centro_id: number | null; activo: boolean }[]>(),
   ]);

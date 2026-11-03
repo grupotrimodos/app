@@ -6,7 +6,9 @@ import Icono, { ICONOS_AREA } from "./Icono";
 
 type Enlace = { id: string; nombre: string; ruta: string };
 const nombres: Record<string, string> = { flota: "Centro de flota", ausencias: "Mis ausencias", deca: "Órdenes de transporte" };
-const orden: Record<string, number> = { flota: 1, chofer: 2, deca: 3, fichaje: 4, ausencias: 5, equipo: 6, admin: 7 };
+const orden: Record<string, number> = {
+  flota: 1, chofer: 2, deca: 3, fichaje: 4, ausencias: 5, documentos: 6, incidencias: 7, equipo: 8, seguridad: 9, admin: 10,
+};
 
 export default function Navegacion({ areas }: { areas: Enlace[] }) {
   const ruta = usePathname();

@@ -12,6 +12,7 @@ App interna para móvil y ordenador. Una sola web (Next.js) con login común y m
 | **Vacaciones y ausencias** | Pedir días; el responsable aprueba y se crea la solicitud en Odoo (Ausencias) | `src/app/ausencias/` · `servicios/rrhh.py` |
 | **Mi equipo** | Para responsables: quién ha fichado, ausencias por aprobar, correcciones de fichajes y camión de cada chófer | `src/app/equipo/` |
 | **Flota** | Centro de tráfico: mapa, última señal, movimiento, combustible, kilómetros, consumo diario y recorridos de los vehículos autorizados en Movildata | `src/app/flota/` · `servicios/flota.py`, `servicios/movildata.py` |
+| **Seguridad** | Caducidades (ITV, seguro y tacógrafo de cada camión; carnet, CAP, tarjeta y reconocimiento de cada persona), carretillas y traspaletas con sus revisiones, inspecciones de almacén e incidencias | `src/app/seguridad/`, `src/app/documentos/`, `src/app/incidencias/` · `src/lib/seguridad.ts` |
 | **Mi camión** | Chóferes: confirmar el camión, consultar sus datos de Movildata y empezar/terminar jornada (ficha a la vez). La detección por tarjeta solo se simula en pruebas | `src/app/chofer/` · `servicios/chofer.py`, `servicios/movildata.py` |
 
 Todo se publica en **un solo proyecto de Vercel**: Next.js para las pantallas y una función Python (`api/index.py`) para DECA y ARGON.
@@ -44,6 +45,7 @@ tests/              pruebas de la API Python      scripts/  diagnóstico, permis
    - Redirect URI (Web): `https://<tu-proyecto>.supabase.co/auth/v1/callback`.
    - Crear un **client secret** y apuntar *Application (client) ID*, el secreto y el *Directory (tenant) ID*.
 2. En Supabase → **Authentication → Providers → Azure**: actívalo, pega el client ID y el secreto, y en *Azure Tenant URL* pon `https://login.microsoftonline.com/<tenant-id>`. Así **solo entran cuentas de la empresa**.
+3. **Calendario de Outlook** (opcional; apagado hasta hacer esto): IT añade en la app de Entra los permisos delegados de Microsoft Graph `offline_access` y `Calendars.ReadWrite` y pulsa *Conceder consentimiento de administrador*. Después, en Vercel: `OUTLOOK_CALENDARIO=true`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (el *Valor* del secreto), `AZURE_TENANT_ID`, y que estén `SECRET_KEY` y `SUPABASE_SECRET_KEY`. Cada persona tiene que salir y volver a entrar con Microsoft una vez. **No activar `OUTLOOK_CALENDARIO` antes del consentimiento**: a todos les saldría «Se necesita la aprobación del administrador» al entrar.
 
 ### 1.3 Conductores y operarios (código + PIN)
 No hace falta configurar nada: los da de alta un administrador desde **Administración** en la app. Por dentro, Supabase guarda un correo interno (`<código>@pin.grupotrimodos.com`) que nadie ve. Deja **activado** el proveedor *Email* (Authentication → Providers), porque el PIN funciona como contraseña.
@@ -129,6 +131,14 @@ npx tsc --noEmit && npx next build                         # web
 - El resumen del día y los recorridos usan **Europe/Madrid**. Se puede consultar un recorrido de los últimos 31 días, dentro de la disponibilidad de Movildata. Si supera 1.000 puntos, se simplifica para visualizarlo y se indica. La clave nunca llega al navegador; las rutas `/api/flota/*` exigen sesión real y permiso, incluso cuando DECA está en pruebas.
 - **Mi camión:** el conductor confirma su camión y recibe únicamente la telemetría de su asignación abierta, comprobada con su sesión en Supabase. En modo real no se identifica al conductor por la matrícula ni se calculan tiempos legales de conducción a partir del GPS. En modo `mock` la demostración de tarjeta y jornada se identifica expresamente como simulada.
 - La web llama a la API Python por el **dominio de producción** (`VERCEL_PROJECT_PRODUCTION_URL`; en las vistas previas, `VERCEL_URL`), o por `APP_URL` si se define. La dirección propia de cada despliegue la tapa el login de Vercel (*Standard Protection*): si se usara, la flota y el envío a Odoo no llegarían.
+
+## 4 bis. Seguridad y calendario
+
+- **Permisos:** `seguridad.ver` (panel de todos los centros), `seguridad.gestionar` (documentación de todos, carretillas, inspecciones y seguimiento de incidencias), `documentos.propios` («Mi documentación») e `incidencias.reportar`. Quien tiene `vehiculos.gestionar` (Oficina) ve y lleva solo la documentación de los camiones (`/seguridad?ver=vehiculos`).
+- **Qué documentación pide cada puesto** se marca en **Administración → Perfiles** (`perfiles.documentos`). A cada persona se le pide en «Mi documentación» y se le avisa en su inicio de lo que falta o caduca en 30 días. Catálogo de tipos: `src/lib/seguridad.ts`.
+- Las **revisiones** de carretillas y las **inspecciones** son un registro: no se cambian ni se borran. Una revisión «fuera de servicio» deja el equipo fuera de servicio.
+- **Incidencias:** quien reporta ve las suyas; seguridad las ve todas y es la única que las cambia. Para cerrarlas hay que apuntar las medidas tomadas.
+- **Calendario de Outlook** (`src/lib/outlook.ts`): agenda de hoy en el inicio y ausencias aprobadas apuntadas en el Outlook de esa persona («fuera de la oficina»). El token de Microsoft se guarda **cifrado** (`microsoft_tokens`, sin acceso para ningún usuario, solo la clave de servidor). Activación: apartado 1.2.
 
 ## 5. Sincronización automática con Odoo
 

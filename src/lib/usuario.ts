@@ -24,12 +24,16 @@ export const usuarioActual = cache(async function usuarioActual() {
     supabase.from("usuarios").select("id,nombre,email,codigo,activo,es_admin").eq("id", uid).maybeSingle<Perfil>(),
     supabase.rpc("mis_permisos"),
   ]);
-  const permisos = new Set<string>(!perfil?.activo ? [] : perfil.es_admin ? TODOS_LOS_PERMISOS : ((lista as string[] | null) ?? []));
+  /** Los de sus perfiles: dicen qué hace en su puesto (un superadministrador puede todo, pero no por eso conduce). */
+  const propios = new Set<string>(!perfil?.activo ? [] : ((lista as string[] | null) ?? []));
+  const permisos = perfil?.activo && perfil.es_admin ? new Set<string>(TODOS_LOS_PERMISOS) : propios;
   /** ¿Tiene alguno de estos permisos? */
   const puede = (...ps: string[]) => ps.some((p) => permisos.has(p));
+  /** ¿Tiene alguno de estos permisos en sus perfiles? Para lo personal del puesto: su camión, su documentación. */
+  const esDeSuPuesto = (...ps: string[]) => ps.some((p) => propios.has(p));
   /** ¿Tiene algún permiso de esta área? (tarjeta del inicio y acceso a su página) */
   const veArea = (area: string) => puede(...permisosDe(area));
-  return { supabase, uid, perfil, permisos, puede, veArea };
+  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, veArea };
 });
 
 /** Usuario activo con alguno de los permisos indicados; si no, vuelve al inicio. */

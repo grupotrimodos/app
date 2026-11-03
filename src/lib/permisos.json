@@ -39,6 +39,28 @@
       ]
     },
     {
+      "id": "documentos", "nombre": "Mi documentación", "ruta": "/documentos",
+      "descripcion": "Tus carnés, certificados y reconocimientos, con su fecha de caducidad.",
+      "permisos": [
+        { "id": "documentos.propios", "nombre": "Mantener al día su propia documentación (la que pide su perfil)" }
+      ]
+    },
+    {
+      "id": "incidencias", "nombre": "Incidencias", "ruta": "/incidencias",
+      "descripcion": "Avisa de un accidente, un incidente o una avería y sigue en qué estado está.",
+      "permisos": [
+        { "id": "incidencias.reportar", "nombre": "Reportar incidencias y ver las suyas" }
+      ]
+    },
+    {
+      "id": "seguridad", "nombre": "Seguridad", "ruta": "/seguridad",
+      "descripcion": "Caducidades de vehículos y personas, carretillas y traspaletas, inspecciones de almacén e incidencias.",
+      "permisos": [
+        { "id": "seguridad.ver", "nombre": "Ver el panel de seguridad de todos los centros (caducidades, equipos, inspecciones e incidencias)" },
+        { "id": "seguridad.gestionar", "nombre": "Gestionar seguridad: documentación de todos, carretillas, inspecciones y seguimiento de incidencias" }
+      ]
+    },
+    {
       "id": "deca", "nombre": "DECA · Orden de transporte", "ruta": "/deca/",
       "descripcion": "Corregir mercancía, bultos, euro palets y peso de la orden y descargar el PDF.",
       "permisos": [
