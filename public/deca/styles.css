@@ -1,5 +1,5 @@
-/* Tipografía: Atkinson Hyperlegible Next (Braille Institute), hecha para leer bien con poca luz o poca vista:
-   distingue 1/l/I y 0/O, clave en números de pedido y pesos. Va dentro de la app: funciona sin conexión. */
+/* Tipografía: Atkinson Hyperlegible Next (Braille Institute), la misma que la app: hecha para leer bien con poca luz o
+   poca vista, distingue 1/l/I y 0/O, clave en números de pedido y pesos. Va dentro de la app: funciona sin conexión. */
 @font-face {
   font-family: "Atkinson Hyperlegible Next";
   font-style: normal; font-weight: 200 800; font-display: swap;
@@ -7,21 +7,40 @@
        url("/deca/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2") format("woff2");
 }
 
-/* Colores: negro puro (cabina de noche, pantallas OLED), un solo color por empresa y verde/rojo solo para sí/no.
-   El color de la empresa marca solo lo importante: franja, botón principal, lo que se ha cambiado y el visor.
-   Todos los textos superan 4,5:1 de contraste y los bordes de los campos 3:1; los botones de color llevan texto negro. */
+/* Colores de la app (fondo claro, barra azul marino, amarillo Grupo Trimodos). Con el móvil en modo oscuro (cabina de
+   noche) se pasa a negro puro: ver más abajo. El color de la empresa marca solo lo importante: la raya de la barra, el
+   botón principal, lo que se ha cambiado y el visor. --brand es el color de fondo; --brand-ink, el mismo tono legible
+   como texto sobre blanco. Todos los textos superan 4,5:1 de contraste y los bordes de los campos 3:1. */
 :root {
-  color-scheme: dark;
-  --bg: #000; --surface: #131313; --surface-2: #1d1d1d; --surface-hover: #282828;
-  --line: #2e2e2e; --line-strong: #626262;          /* fina: separa; fuerte: borde de lo que se toca o se escribe */
-  --fg: #fff; --muted: #ababab;
-  --brand: #fcda00; --brand-tint: #1f1a00;           /* amarillo Grupo Trimodos (por defecto) */
-  --warn: #ffd400; --ok: #00e060; --bad: #ff5a5a; --info: #5cc8ff;
+  color-scheme: light dark;
+  --bg: #f4f5f7; --surface: #fff; --surface-2: #fff; --surface-hover: #f0f3f6; --input: #fff;
+  --line: #dde3e9; --line-strong: #7f8e9d; --line-ghost: #ccd5df;   /* fina: separa; fuerte: borde de lo que se toca */
+  --fg: #182737; --muted: #5b6b7c;
+  --bar: #142535;                                                  /* barra superior: la misma que el menú de la app */
+  --brand: #fcda00; --on-brand: #182330; --brand-ink: #6e5600; --brand-tint: #fff6c2;   /* amarillo Grupo Trimodos */
+  --warn: #8a5a00; --warn-bg: #fff6dc; --ok: #16734f; --on-ok: #fff; --ok-bg: #e3f4ec;
+  --bad: #b52b3b; --bad-bg: #fff0f1; --info: #2d6da3; --info-bg: #eef5fb;
+  --overlay: rgba(20, 37, 53, .58); --sombra: 0 4px 22px #1827370a;
   --tap: 60px; --tap-big: 68px; --field: 56px;       /* alturas pensadas para el dedo (con guantes) */
-  --gutter: 18px; --r-sm: 12px; --r: 14px; --r-lg: 20px;
+  --gutter: 18px; --r-sm: 12px; --r: 14px; --r-lg: 16px;
 }
-body[data-company="stinsa"]    { --brand: #009f92; --brand-tint: #001f1c; }   /* verde STINSA */
-body[data-company="transargi"] { --brand: #f17e49; --brand-tint: #261108; }   /* naranja TRANSARGI */
+body[data-company="stinsa"]    { --brand: #009f92; --on-brand: #000; --brand-ink: #00695f; --brand-tint: #e2f4f2; }   /* verde STINSA */
+body[data-company="transargi"] { --brand: #f17e49; --on-brand: #000; --brand-ink: #a8461a; --brand-tint: #fdece3; }   /* naranja TRANSARGI */
+
+/* Cabina de noche: negro puro (pantallas OLED), colores de empresa intensos sobre negro. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000; --surface: #131313; --surface-2: #1d1d1d; --surface-hover: #282828; --input: #000;
+    --line: #2e2e2e; --line-strong: #626262; --line-ghost: #3d3d3d;
+    --fg: #fff; --muted: #ababab; --bar: #0b1520;
+    --brand: #fcda00; --on-brand: #000; --brand-ink: #fcda00; --brand-tint: #1f1a00;
+    --warn: #ffd400; --warn-bg: #1f1a00; --ok: #00e060; --on-ok: #000; --ok-bg: rgba(0, 224, 96, .14);
+    --bad: #ff5a5a; --bad-bg: #250808; --info: #5cc8ff; --info-bg: #04161f;
+    --overlay: rgba(0, 0, 0, .82); --sombra: none;
+  }
+  body[data-company="stinsa"]    { --brand-ink: #009f92; --brand-tint: #001f1c; }
+  body[data-company="transargi"] { --brand-ink: #f17e49; --brand-tint: #261108; }
+}
 
 * { box-sizing: border-box; }
 html { font-size: 18px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -29,22 +48,22 @@ body {
   margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
   background: var(--bg); color: var(--fg);
   font-family: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  line-height: 1.4;
+  line-height: 1.4; -webkit-font-smoothing: antialiased;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 [hidden] { display: none !important; }
 button, input { font: inherit; color: inherit; }
 
-/* Cada pantalla ocupa el alto que queda bajo la franja de marca (sin scroll en el menú). */
+/* Cada pantalla ocupa el alto que queda bajo la barra (sin scroll en el menú). */
 .screen { flex: 1 0 auto; width: 100%; max-width: 560px; margin: 0 auto; padding: 22px var(--gutter) 32px; display: flex; flex-direction: column; gap: 16px; }
-/* Escala: 15 · 18 · 20 · 28 px. Títulos un punto más apretados; sin palabras sueltas en la 2.ª línea. */
-h1 { font-size: 1.55rem; line-height: 1.15; font-weight: 750; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+/* Escala: 15 · 18 · 20 · 28 px. Títulos un punto más apretados (como en la app); sin palabras sueltas en la 2.ª línea. */
+h1 { font-size: 1.55rem; line-height: 1.15; font-weight: 800; letter-spacing: -.025em; margin: 0; text-wrap: balance; }
 h2 { font-size: 1.12rem; line-height: 1.25; font-weight: 700; margin: 0; text-wrap: balance; }
 .hint { color: var(--muted); font-size: .94rem; margin: 0; }
 .num, input[inputmode=numeric], input[inputmode=decimal] { font-variant-numeric: tabular-nums; }
 
 /* ---- Botones ---- */
-/* Principal: color de la empresa. Secundario: relleno gris. Ghost: solo borde (volver, cancelar). */
+/* Principal: color de la empresa. Secundario: blanco con borde. Ghost: solo borde suave (volver, cancelar). */
 .btn {
   min-height: var(--tap); width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
   border-radius: var(--r); border: 1.5px solid var(--line-strong); background: var(--surface-2); color: var(--fg);
@@ -53,31 +72,34 @@ h2 { font-size: 1.12rem; line-height: 1.25; font-weight: 700; margin: 0; text-wr
 }
 .btn:active:not(:disabled) { transform: scale(.985); }
 :focus-visible { outline: 3px solid var(--info); outline-offset: 3px; }
-.btn.primary { background: var(--brand); color: #000; border-color: var(--brand); }
-.btn.ok { background: var(--ok); color: #000; border-color: var(--ok); }
+.btn.primary { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.btn.ok { background: var(--ok); color: var(--on-ok); border-color: var(--ok); }
 .btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }   /* «No»: rojo, pero sin tapar al «Sí» */
-.btn.ghost { background: transparent; border-color: #3d3d3d; }                        /* no compite con el principal */
+.btn.ghost { background: transparent; border-color: var(--line-ghost); }               /* no compite con el principal */
 .btn.huge { min-height: var(--tap-big); font-size: 1.2rem; }
-.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 .actions { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
 @media (prefers-reduced-motion: no-preference) { .btn { transition: transform .08s, filter .12s, background-color .12s, border-color .12s; } }
 
-/* ---- Marca: franja blanca con el logo (los logos llevan texto de color) y raya del color de la empresa ---- */
-.brandbar { background: #fff; display: flex; align-items: center; justify-content: center; padding: 12px 16px; border-bottom: 4px solid var(--brand); }
-.brandbar a { display: flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; }
-/* Tamaño por MÁXIMOS con alto y ancho automáticos: el navegador reduce el logo siempre en proporción. */
-.brandbar img { height: auto; width: auto; max-height: 34px; max-width: 62%; object-fit: contain; display: block; }
-.brandbar a > img { max-width: 62vw; }   /* en la guía el logo va dentro de un enlace: el % sería del propio enlace */
+/* ---- Barra de la app: azul marino, el logo en su recuadro blanco (los logos llevan texto de color) y la raya del color
+   de la empresa. ---- */
+.brandbar { background: var(--bar); display: flex; align-items: center; justify-content: center; padding: 12px 16px; border-bottom: 4px solid var(--brand); }
+/* Recuadro blanco del logo (en la guía es el propio enlace a la app). */
+.brandbar-logo, .brandbar a { display: flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px;
+  background: #fff; padding: 8px 14px; border-radius: 7px; }
+/* Tamaño por MÁXIMOS con alto y ancho automáticos: el navegador reduce el logo siempre en proporción. En vw, porque un %
+   sería del propio recuadro, que se ajusta al logo. */
+.brandbar img { height: auto; width: auto; max-height: 30px; max-width: 58vw; object-fit: contain; display: block; }
 /* Sin empresa todavía (menú, escáner, guía): raya del grupo con los tres colores, como en /img/compartir.png. */
 body:not([data-company]) .brandbar { border-image: linear-gradient(90deg, #fcda00 0 33.34%, #009f92 0 66.67%, #f17e49 0) 1; }
-body[data-screen="menu"] .brandbar { padding: 22px 16px; }
-body[data-screen="menu"] .brandbar img { max-height: 58px; max-width: 76%; }
+body[data-screen="menu"] .brandbar { padding: 20px 16px; }
+body[data-screen="menu"] .brandbar img { max-height: 50px; max-width: 66vw; }
 
-/* ---- Avisos: raya de color a la izquierda, texto blanco ---- */
+/* ---- Avisos: raya de color a la izquierda, fondo suave ---- */
 .banner { padding: 12px 14px; border-radius: var(--r-sm); font-weight: 600; border: 1px solid; border-left-width: 5px; margin: 0; }
-.banner.bad { border-color: var(--bad); background: #250808; }
-.banner.warn { border-color: var(--warn); background: #1f1a00; }
-.banner.info { border-color: var(--info); background: #04161f; }
+.banner.bad { border-color: var(--bad); background: var(--bad-bg); }
+.banner.warn { border-color: var(--warn); background: var(--warn-bg); }
+.banner.info { border-color: var(--info); background: var(--info-bg); }
 #err { position: sticky; top: 0; z-index: 30; border-radius: 0; border-width: 0 0 2px; padding: 14px var(--gutter); font-size: 1rem; }
 #edit-banners { display: flex; flex-direction: column; gap: 10px; }
 #edit-banners:empty { display: none; }
@@ -97,8 +119,8 @@ body[data-screen="menu"] .brandbar img { max-height: 58px; max-width: 76%; }
 /* «DECA - Trimodos» mide ~8 veces el tamaño de letra: se reduce lo justo para que quepa en una línea en móviles estrechos. */
 #s-menu h1 { text-align: center; font-size: min(1.9rem, calc((100vw - 2 * var(--gutter)) / 8.2)); }
 #s-menu .lead { text-align: center; color: var(--muted); margin: -8px auto 6px; max-width: 30ch; }
-#s-menu #btn-scan { position: relative; min-height: min(40vh, 320px); flex-direction: column; gap: 18px; border-radius: var(--r-lg); padding: 32px; font-size: 1.4rem; }
-#s-menu #btn-scan::before { content: ""; position: absolute; inset: 16px; pointer-events: none; --c: rgba(0, 0, 0, .85); --l: 30px; --w: 5px; }
+#s-menu #btn-scan { position: relative; min-height: min(40vh, 320px); flex-direction: column; gap: 18px; border-radius: var(--r-lg); padding: 32px; font-size: 1.4rem; box-shadow: 0 8px 26px #b79c0026; }
+#s-menu #btn-scan::before { content: ""; position: absolute; inset: 16px; pointer-events: none; --c: rgba(24, 35, 48, .85); --l: 30px; --w: 5px; }
 #btn-scan .qr { width: 60px; height: 60px; display: block; }
 #btn-scan span { max-width: 13ch; text-wrap: balance; }
 #s-menu #btn-guia { min-height: 54px; font-size: 1rem; }   /* secundario: el botón grande sigue siendo uno solo */
@@ -116,10 +138,9 @@ body[data-screen="menu"] .brandbar img { max-height: 58px; max-width: 76%; }
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, .8));
 }
 .manual { border-top: 1px solid var(--line); padding-top: 20px; display: flex; flex-direction: column; gap: 12px; }
-/* Empresa: su logo (de /img, un solo color: se lee sobre oscuro). La elegida se ve como la franja que tendrá la orden:
-   logo sobre blanco, con el borde del color de la empresa. */
+/* Empresa: su logo (de color: se lee sobre claro y sobre oscuro). La elegida, sobre blanco con el borde de su color. */
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.seg-btn { --co: var(--brand); padding: 10px 14px; }
+.seg-btn { --co: var(--brand); padding: 10px 14px; border-color: var(--line-ghost); }
 .seg-btn[data-company="stinsa"]    { --co: #009f92; }
 .seg-btn[data-company="transargi"] { --co: #f17e49; }
 .seg-btn img { height: 26px; width: auto; max-width: 100%; object-fit: contain; display: block; pointer-events: none; }
@@ -127,20 +148,20 @@ body[data-screen="menu"] .brandbar img { max-height: 58px; max-width: 76%; }
 
 input[type=text], input[type=password] {
   width: 100%; min-height: var(--field); font-size: 1.25rem; padding: 10px 14px; border-radius: var(--r-sm);
-  border: 1.5px solid var(--line-strong); background: #000; color: var(--fg);
+  border: 1.5px solid var(--line-strong); background: var(--input); color: var(--fg);
 }
 input[type=text]:focus-visible, input[type=password]:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent); }
-input::placeholder { color: #8a8a8a; opacity: 1; }
-input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-color: var(--line); -webkit-text-fill-color: var(--muted); opacity: 1; }
+input::placeholder { color: var(--muted); opacity: 1; }
+input[type=text]:disabled { color: var(--muted); background: var(--bg); border-color: var(--line); -webkit-text-fill-color: var(--muted); opacity: 1; }
 
 /* ---- Pantalla 3: datos y edición ---- */
 /* Cada lugar se lee como la orden de papel: cabecera (lugar y bulto), ruta, y casillas con su etiqueta encima. */
-.pkg { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+.pkg { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; box-shadow: var(--sombra); }
 .pkg h2, .diff h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .code { color: var(--muted); font-size: .88rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 .route { color: var(--muted); font-size: .94rem; margin-top: -8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .field label { display: block; font-size: .88rem; font-weight: 650; color: var(--muted); margin-bottom: 6px; }
-.field.changed label { color: var(--brand); }
+.field.changed label { color: var(--brand-ink); }
 .field.changed input { border-color: var(--brand); }
 /* Valor anterior: solo aparece en lo que se cambia (mismo «Antes» que en el resumen). */
 .field .was { display: none; color: var(--muted); font-size: .85rem; margin-top: 6px; }
@@ -152,7 +173,7 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
 
 /* ---- Pantalla 4: resumen y resultado ---- */
 .diffs { display: flex; flex-direction: column; gap: 14px; }
-.diff { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 4px 18px 6px; overflow: hidden; }
+.diff { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 4px 18px 6px; overflow: hidden; box-shadow: var(--sombra); }
 .diff h2 { padding: 14px 0; }
 .diff .line { display: grid; gap: 2px; padding: 12px 0; border-top: 1px solid var(--line); }
 /* Lo cambiado: fila entera con fondo y raya del color de la empresa; lo demás, en gris y en una línea. */
@@ -160,7 +181,7 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
 .diff .line.changed::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--brand); }
 .diff .lbl { font-weight: 700; font-size: .94rem; }
 .diff .before { color: var(--muted); text-decoration: line-through; font-variant-numeric: tabular-nums; }
-.diff .after { font-size: 1.25rem; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums; }
+.diff .after { font-size: 1.25rem; font-weight: 800; color: var(--brand-ink); font-variant-numeric: tabular-nums; }
 .diff .line.same { grid-template-columns: 1fr auto; gap: 12px; color: var(--muted); }
 .diff .line.same .lbl { font-weight: 600; }
 .diff .line.same .val { font-variant-numeric: tabular-nums; text-align: right; }
@@ -169,21 +190,21 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
 #review-body.result { display: grid; grid-template-columns: 56px 1fr; column-gap: 16px; row-gap: 14px; align-items: center; }
 #review-body.result > .banner { grid-column: 1 / -1; }
 #review-body.result > p { margin: 0; font-size: 1.05rem; max-width: 60ch; }
-.done-mark { width: 56px; height: 56px; padding: 11px; border-radius: 50%; background: rgba(0, 224, 96, .14); color: var(--ok); }
+.done-mark { width: 56px; height: 56px; padding: 11px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); }
 .done-mark svg { width: 100%; height: 100%; display: block; }
 @media (prefers-reduced-motion: no-preference) {
   .done-mark path { stroke-dasharray: 60; stroke-dashoffset: 60; animation: trazo .45s .1s ease-out forwards; }
 }
 @keyframes trazo { to { stroke-dashoffset: 0; } }
 
-/* ---- Ventanas (código, confirmación, peso, espera) ---- */
-.overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .82); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
-.dialog { background: #151515; border: 1px solid #333; border-top: 4px solid var(--brand); border-radius: var(--r-lg); padding: 22px; width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+/* ---- Ventanas (confirmación, peso, espera) ---- */
+.overlay { position: fixed; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 40; }
+.dialog { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--brand); border-radius: var(--r-lg); padding: 22px; width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 18px 50px #14253533; }
 .dialog h2 { font-size: 1.5rem; }
 .dialog p { margin: 0; }
 .mma-list { margin: 0; padding-left: 1.2rem; font-size: 1.12rem; font-weight: 700; color: var(--warn); font-variant-numeric: tabular-nums; }
 /* Barra de espera (guardar e imprimir tarda unos segundos) */
-.progress { height: 6px; border-radius: 3px; background: #2e2e2e; overflow: hidden; }
+.progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .progress span { display: block; width: 40%; height: 100%; border-radius: inherit; background: var(--brand); }
 @media (prefers-reduced-motion: no-preference) { .progress span { animation: progreso 1.3s ease-in-out infinite; } }
 @media (prefers-reduced-motion: reduce) { .progress span { width: 100%; animation: pulso 1.6s ease-in-out infinite alternate; } }
@@ -192,14 +213,14 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
 
 /* ---- Guía (generada desde GUIA_CONDUCTORES.md) ---- */
 .guia { gap: 10px; padding-bottom: 32px; }
-.guia > a.btn:first-child { background: transparent; color: var(--fg); border-color: #3d3d3d; }   /* arriba, discreto; el de abajo, el principal */
+.guia > a.btn:first-child { background: transparent; color: var(--fg); border-color: var(--line-ghost); }   /* arriba, discreto; el de abajo, el principal */
 .guia h1 { margin: 12px 0 4px; }
-.guia h2 { margin: 24px 0 4px; color: var(--brand); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.guia h2 { margin: 24px 0 4px; color: var(--brand-ink); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .guia p, .guia li { margin: .45rem 0; }
 .guia ol, .guia ul { padding-left: 1.4rem; margin: .3rem 0; }
 .guia li { margin: .65rem 0; }
 .guia li::marker { color: var(--muted); font-weight: 700; }
-.guia strong { color: #fff; }
+.guia strong { color: var(--fg); }
 .guia em { color: var(--muted); }
 .guia table, .guia tbody, .guia tr, .guia td { display: block; }   /* la tabla de avisos pasa a tarjetas: cabe en el móvil */
 .guia thead { display: none; }
@@ -211,9 +232,9 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
 @media (hover: hover) and (pointer: fine) {
   html { font-size: 17px; }
   :root { --tap: 50px; --tap-big: 56px; --field: 50px; }
-  .btn:hover:not(:disabled) { filter: brightness(1.08); }
-  .btn:not(.primary):not(.ok):not(.danger):not([aria-checked="true"]):hover:not(:disabled) { background: var(--surface-hover); border-color: #8a8a8a; filter: none; }
-  .btn.danger:hover:not(:disabled) { background: #2a0c0c; filter: none; }
+  .btn:hover:not(:disabled) { filter: brightness(1.04); }
+  .btn:not(.primary):not(.ok):not(.danger):not([aria-checked="true"]):hover:not(:disabled) { background: var(--surface-hover); border-color: var(--muted); filter: none; }
+  .btn.danger:hover:not(:disabled) { background: var(--bad-bg); filter: none; }
   #s-menu #btn-guia { min-height: 48px; }
 }
 
@@ -223,8 +244,8 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
   .screen { max-width: 1080px; padding-top: 40px; padding-bottom: 56px; gap: 22px; }
   h1 { font-size: 2rem; }
   .brandbar { padding: 14px 32px; }
-  .brandbar img { max-height: 40px; }
-  body[data-screen="menu"] .brandbar img { max-height: 60px; }
+  .brandbar img { max-height: 36px; }
+  body[data-screen="menu"] .brandbar img { max-height: 52px; }
   #s-menu { max-width: 520px; }
   #s-menu h1 { font-size: 2.2rem; }
   #s-menu #btn-scan { min-height: 280px; }
@@ -234,7 +255,7 @@ input[type=text]:disabled { color: var(--muted); background: #0a0a0a; border-col
   #s-scan > h1, #s-scan > .btn { grid-column: 1 / -1; }
   #s-scan > .btn { justify-self: start; width: auto; min-width: 220px; }
   .cam { max-height: 58vh; aspect-ratio: 4 / 3; }
-  .manual { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; background: var(--surface); gap: 14px; }
+  .manual { border: 1px solid var(--line); border-radius: var(--r-lg); padding: 24px; background: var(--surface); gap: 14px; box-shadow: var(--sombra); }
 
   /* edición: fichas en dos columnas. Resumen: una ficha bajo otra, leída como tabla (dato, antes, ahora) */
   #packages { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; align-items: start; }
