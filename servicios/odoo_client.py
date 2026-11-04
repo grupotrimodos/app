@@ -5,6 +5,8 @@ impresión SOLO del informe tms_reporting.tms_transportation_order.
 """
 import json
 import logging
+import os
+import re
 
 import httpx
 
@@ -229,10 +231,15 @@ class OdooClient:
         return self._totales(INVOICE_MODEL, domain, "amount_residual_signed")
 
     def buscar_empleado(self, correo: str | None = None, credencial: str | None = None) -> list[dict]:
-        """Empleados activos con ese correo de trabajo o ese código de credencial (campo «barcode»)."""
+        """Empleados activos con ese correo de trabajo o ese código de credencial (campo «barcode»).
+        Con ODOO_CAMPO_CORREO (p. ej. «x_correo_app», un campo propio de la ficha), el correo se busca también ahí:
+        sirve para quien entra con Google sin tocar el correo de trabajo."""
         if correo:   # =ilike sin comodines: «_» y «%» del correo se escapan
             literal = correo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             dominio = [["work_email", "=ilike", literal]]
+            extra = (os.environ.get("ODOO_CAMPO_CORREO") or "").strip()
+            if re.fullmatch(r"x_[a-z0-9_]{1,60}|private_email", extra):   # solo un nombre de campo válido
+                dominio = ["|", dominio[0], [extra, "=ilike", literal]]
         elif credencial:
             dominio = [["barcode", "=", credencial]]
         else:

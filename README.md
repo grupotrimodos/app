@@ -47,10 +47,17 @@ tests/              pruebas de la API Python      scripts/  diagnóstico, permis
 2. En Supabase → **Authentication → Providers → Azure**: actívalo, pega el client ID y el secreto, y en *Azure Tenant URL* pon `https://login.microsoftonline.com/<tenant-id>`. Así **solo entran cuentas de la empresa**.
 3. **Calendario de Outlook** (opcional; apagado hasta hacer esto): IT añade en la app de Entra los permisos delegados de Microsoft Graph `offline_access` y `Calendars.ReadWrite` y pulsa *Conceder consentimiento de administrador*. Después, en Vercel: `OUTLOOK_CALENDARIO=true`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (el *Valor* del secreto), `AZURE_TENANT_ID`, y que estén `SECRET_KEY` y `SUPABASE_SECRET_KEY`. Cada persona tiene que salir y volver a entrar con Microsoft una vez. **No activar `OUTLOOK_CALENDARIO` antes del consentimiento**: a todos les saldría «Se necesita la aprobación del administrador» al entrar.
 
-### 1.3 Conductores y operarios (código + PIN)
+### 1.3 Conductores y operarios con Google (opcional)
+1. **Google Cloud Console** → *APIs y servicios* → *Credenciales* → *Crear ID de cliente de OAuth* (aplicación web). URI de redirección autorizada: `https://<tu-proyecto>.supabase.co/auth/v1/callback`. Solo pide nombre y correo: Google no exige revisión.
+2. **Supabase → Authentication → Sign In / Providers → Google**: actívalo y pega el *Client ID* y el *Client Secret*.
+3. **Vercel:** `LOGIN_GOOGLE=true` (sin esto el botón no sale) y Redeploy.
+4. Quien entra con Google aparece **inactivo** en «Personas por configurar» hasta que le das puesto y centro.
+5. **Enlace con Odoo:** su Gmail en el **«Correo de trabajo»** de su ficha de empleado (si no tiene correo de empresa), o en un campo propio de la ficha (p. ej. «Correo de acceso a la app») indicando su nombre técnico en `ODOO_CAMPO_CORREO=x_...`.
+
+### 1.4 Conductores y operarios (código + PIN)
 No hace falta configurar nada: los da de alta un administrador desde **Administración** en la app. Por dentro, Supabase guarda un correo interno (`<código>@pin.grupotrimodos.com`) que nadie ve. Deja **activado** el proveedor *Email* (Authentication → Providers), porque el PIN funciona como contraseña.
 
-### 1.4 Primer administrador
+### 1.5 Primer administrador
 1. Entra en la app con tu cuenta de Microsoft (verás «pendiente de activar»: es normal).
 2. En Supabase → SQL Editor:
    ```sql
@@ -60,14 +67,14 @@ No hace falta configurar nada: los da de alta un administrador desde **Administr
 
 > **Toda cuenta nueva nace inactiva y sin perfiles.** Hasta que un administrador la activa no ve nada, ni en las pantallas ni en la API.
 
-### 1.5 Vercel
+### 1.6 Vercel
 1. *Add New Project* → importar `grupotrimodos/app`. Vercel detecta **Next.js** solo; la función Python de `api/index.py` se publica en el mismo proyecto.
 2. *Settings → Environment Variables*: todas las de `.env.example`, marcando como **Sensitive** las secretas (`SUPABASE_SECRET_KEY`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `SECRET_KEY`, `ARGON_CLAVE`, `ARGON_ODOO_PASSWORD`, `CRON_SECRET`, `MOVILDATA_API_KEY`). Los cambios de variables se aplican con un **Redeploy**.
 3. *Settings → Deployment Protection*: desactivar *Vercel Authentication* (la app ya tiene su propio login).
 4. *Settings → Domains*: añadir el subdominio (p. ej. `app.grupotrimodos.com`).
 5. **Uso con personal de la empresa = plan Pro** (el plan Hobby es solo para uso personal y no comercial).
 
-### 1.6 n8n (ARGON)
+### 1.7 n8n (ARGON)
 ARGON mantiene su dirección: `POST https://<dominio>/api/argon/procesar` con la cabecera `X-Clave`. Solo hay que cambiar el dominio en n8n cuando se apague la app antigua.
 
 ---

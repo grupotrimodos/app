@@ -5,23 +5,28 @@ import { createClient } from "@/lib/supabase/client";
 import { CODIGO_RE, PIN_RE, correoDeCodigo } from "@/lib/pin";
 import Icono from "../Icono";
 
-/** `alcance`: lo que se pide a Microsoft además del correo (el calendario, solo si está activado en el servidor). */
-export default function FormularioLogin({ destino, alcance = "" }: { destino: string; alcance?: string }) {
+/** `alcance`: lo que se pide a Microsoft además del correo (el calendario, solo si está activado en el servidor).
+ *  `google`: botón «Continuar con Google» para chóferes y operarios (solo cuando el proveedor está activado en Supabase). */
+export default function FormularioLogin({ destino, alcance = "", google = false }: { destino: string; alcance?: string; google?: boolean }) {
   const [codigo, setCodigo] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [cargando, setCargando] = useState<"microsoft" | "pin" | null>(null);
+  const [cargando, setCargando] = useState<"microsoft" | "google" | "pin" | null>(null);
 
-  async function conMicrosoft() {
+  async function conCuenta(proveedor: "azure" | "google") {
+    const nombre = proveedor === "azure" ? "Microsoft" : "Google";
     setError(null);
-    setCargando("microsoft");
+    setCargando(proveedor === "azure" ? "microsoft" : "google");
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: "azure",
-        options: { scopes: `email ${alcance}`.trim(), redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(destino)}` },
+        provider: proveedor,
+        options: {
+          scopes: proveedor === "azure" ? `email ${alcance}`.trim() : undefined,
+          redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(destino)}`,
+        },
       });
-      if (error) { setError("No se ha podido abrir el inicio de sesión de Microsoft. Inténtalo de nuevo."); setCargando(null); }
+      if (error) { setError(`No se ha podido abrir el inicio de sesión de ${nombre}. Inténtalo de nuevo.`); setCargando(null); }
     } catch {
       setError("No se ha podido conectar. Comprueba tu conexión y vuelve a intentarlo.");
       setCargando(null);
@@ -53,7 +58,7 @@ export default function FormularioLogin({ destino, alcance = "" }: { destino: st
     <section className="login-oficina" aria-labelledby="titulo-oficina">
       <h3 id="titulo-oficina">Personal de oficina</h3>
       <p className="hint">Utiliza tu cuenta de la empresa.</p>
-      <button className="btn ancho login-microsoft" type="button" onClick={conMicrosoft} disabled={Boolean(cargando)}>
+      <button className="btn ancho login-microsoft" type="button" onClick={() => conCuenta("azure")} disabled={Boolean(cargando)}>
         <span className="login-microsoft-marca" aria-hidden="true"><i /><i /><i /><i /></span>
         {cargando === "microsoft" ? "Abriendo Microsoft…" : "Continuar con Microsoft"}
       </button>
@@ -61,6 +66,13 @@ export default function FormularioLogin({ destino, alcance = "" }: { destino: st
     <div className="separador">o entra con tu código</div>
     <form onSubmit={conPin} noValidate>
       <h3>Conductores y operarios</h3>
+      {google && <>
+        <button className="btn ancho login-google" type="button" onClick={() => conCuenta("google")} disabled={Boolean(cargando)}>
+          <span className="login-google-marca" aria-hidden="true">G</span>
+          {cargando === "google" ? "Abriendo Google…" : "Continuar con Google"}
+        </button>
+        <p className="login-o">o con tu código y PIN</p>
+      </>}
       <div className="login-campos"><div>
         <label htmlFor="codigo">Código de empleado</label>
         <input id="codigo" name="codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} autoComplete="username"

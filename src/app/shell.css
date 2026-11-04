@@ -135,6 +135,9 @@ a.inicio-kpi:hover { border-color: #8fa5b9; box-shadow: 0 7px 21px #18273709; }
 .login-formularios h3 { font-size: 15px; margin-bottom: 6px; }
 .login-oficina > .hint { font-size: 12px; margin-bottom: 15px; }
 .login-microsoft { gap: 12px; font-size: 14px; font-weight: 600; }
+.login-google { gap: 12px; font-size: 14px; font-weight: 600; margin-top: 4px; }
+.login-google-marca { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #dfe6ec; font-weight: 800; font-size: 13px; color: #4285f4; }
+.login-o { margin: 14px 0 0; text-align: center; font-size: 12px; color: #7c8a97; }
 .login-microsoft-marca { display: grid; grid-template-columns: repeat(2, 8px); gap: 2px; }
 .login-microsoft-marca i { display: block; width: 8px; height: 8px; background: #f35325; }
 .login-microsoft-marca i:nth-child(2) { background: #81bc06; }

@@ -373,3 +373,20 @@ def test_cuadro_de_mando_sigue_si_falta_una_aplicacion():
     d = direccion.calcular(odoo, date(2026, 11, 4))
     assert d["crm"]["ganadas_mes"] == 5 and d["ventas"] is None and d["facturacion"] is None
     assert any("Ventas" in a for a in d["avisos"]) and any("Facturación" in a for a in d["avisos"])
+
+
+def test_enlace_por_correo_busca_tambien_el_campo_configurado(monkeypatch):
+    from types import SimpleNamespace
+    from servicios.odoo_client import OdooClient
+    c = OdooClient(SimpleNamespace(company_ids=[1, 7]))
+    visto: dict = {}
+    monkeypatch.setattr(c, "_call", lambda model, method, args, kwargs=None: visto.update(dominio=args[0]) or [])
+    monkeypatch.delenv("ODOO_CAMPO_CORREO", raising=False)
+    c.buscar_empleado(correo="pepe@gmail.com")
+    assert visto["dominio"] == [["work_email", "=ilike", "pepe@gmail.com"]]
+    monkeypatch.setenv("ODOO_CAMPO_CORREO", "x_correo_app")      # campo propio de la ficha (quien entra con Google)
+    c.buscar_empleado(correo="pepe@gmail.com")
+    assert visto["dominio"] == ["|", ["work_email", "=ilike", "pepe@gmail.com"], ["x_correo_app", "=ilike", "pepe@gmail.com"]]
+    monkeypatch.setenv("ODOO_CAMPO_CORREO", "name, active")      # no es un nombre de campo válido: se ignora
+    c.buscar_empleado(correo="pepe@gmail.com")
+    assert visto["dominio"] == [["work_email", "=ilike", "pepe@gmail.com"]]

@@ -18,6 +18,9 @@ type Fila = {
   usuario_perfil: { id: number; perfil_id: number; centro_id: number | null }[];
 };
 
+/** Con qué cuenta entra: la de la empresa es de Microsoft; cualquier otro correo, de Google. */
+const entraCon = (email: string | null) => (email?.toLowerCase().endsWith("@grupotrimodos.com") ? "Microsoft" : "Google");
+
 /** Perfil y centro. Al dar de alta, los dos son obligatorios: sin centro, ningún responsable recibe sus solicitudes. */
 function ElegirPerfilCentro({ perfiles, centros, obligatorio = false }: { perfiles: PerfilRol[]; centros: Centro[]; obligatorio?: boolean }) {
   return (
@@ -127,7 +130,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           <p className="hint">No tienen perfil: no ven nada y lo que pidan no le llega a nadie. Elige su puesto y su centro y quedan activas.</p>
           {porConfigurar.map((u) => <form key={u.id} action={configurarUsuario} className="fila-form configurar">
             <input type="hidden" name="id" value={u.id} />
-            <div><b>{u.nombre || "(sin nombre)"}</b><div className="hint">{u.codigo ? `Código ${u.codigo} + PIN` : `Microsoft · ${u.email ?? ""}`}
+            <div><b>{u.nombre || "(sin nombre)"}</b><div className="hint">{u.codigo ? `Código ${u.codigo} + PIN` : `${entraCon(u.email)} · ${u.email ?? ""}`}
               {!u.activo && " · inactivo"}</div></div>
             <ElegirPerfilCentro perfiles={listaPerfiles} centros={listaCentros} obligatorio />
             <button className="btn primario">Activar con este perfil</button>
@@ -136,8 +139,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
 
         <section className="panel">
           <h2>Usuarios ({usuarios?.length ?? 0})</h2>
-          <p className="hint">El personal de oficina aparece aquí al entrar por primera vez con Microsoft: actívalo y asígnale uno o
-            varios perfiles. Lo que ve y puede hacer cada persona es la suma de sus perfiles.</p>
+          <p className="hint">Quien entra por primera vez con Microsoft (oficina) o con Google (chóferes y operarios) aparece arriba,
+            en «Personas por configurar». Lo que ve y puede hacer cada persona es la suma de sus perfiles.</p>
           <table>
             <thead><tr><th>Usuario</th><th>Acceso</th><th>Perfiles</th><th>Editar</th></tr></thead>
             <tbody>
@@ -148,7 +151,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
                     <span className={`etiqueta ${u.activo ? "ok" : ""}`}>{u.activo ? "Activo" : "Inactivo"}</span>{" "}
                     {u.es_admin && <span className="etiqueta">Superadministrador</span>}
                   </td>
-                  <td>{u.codigo ? <>Código <b>{u.codigo}</b> + PIN</> : <>Microsoft<br /><span className="hint">{u.email}</span></>}</td>
+                  <td>{u.codigo ? <>Código <b>{u.codigo}</b> + PIN</> : <>{entraCon(u.email)}<br /><span className="hint">{u.email}</span></>}</td>
                   <td>
                     {u.usuario_perfil.length === 0 && <span className="hint">{u.es_admin ? "Todo" : "Ninguno"}</span>}
                     {u.usuario_perfil.map((a) => (

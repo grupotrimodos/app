@@ -14,7 +14,9 @@ export async function GET(request: Request) {
     if (!error) {
       // Para su calendario de Outlook (si está activado). Si falla, se entra igual: solo no se verá la agenda.
       const renovacion = data.session?.provider_refresh_token;
-      if (renovacion && data.user) await guardarTokenMicrosoft(data.user.id, renovacion).catch(() => {});
+      if (renovacion && data.user?.app_metadata?.provider === "azure") {
+        await guardarTokenMicrosoft(data.user.id, renovacion).catch(() => {});   // solo el de Microsoft (no el de Google)
+      }
       return NextResponse.redirect(`${origin}${destino}`);
     }
   }

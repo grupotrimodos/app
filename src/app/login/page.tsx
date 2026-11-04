@@ -27,7 +27,8 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         <h2 id="titulo-acceso">Te damos la bienvenida.</h2>
         <p className="lead">Entra para continuar con tu jornada.</p>
         {error && <p className="error" role="alert">No se ha podido iniciar sesión. Inténtalo de nuevo.</p>}
-        <FormularioLogin destino={destino} alcance={calendarioActivo() ? ALCANCE_OUTLOOK : ""} />
+        <FormularioLogin destino={destino} alcance={calendarioActivo() ? ALCANCE_OUTLOOK : ""}
+          google={process.env.LOGIN_GOOGLE === "true"} />
         <p className="login-privado"><Icono nombre="escudo" size={16} />Espacio privado de Grupo Trimodos</p>
       </section>
     </main>
