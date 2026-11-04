@@ -17,7 +17,7 @@ def _sesion_real(u: Usuario):
 
 
 @router.get("/resumen")
-def resumen(u: Usuario = Depends(requiere_permiso("flota.ver"))):
+def resumen(u: Usuario = Depends(requiere_permiso(("flota.ver", "direccion.ver")))):   # el cuadro de mando enseña el resumen
     _sesion_real(u)
     return movildata.resumen_flota()
 

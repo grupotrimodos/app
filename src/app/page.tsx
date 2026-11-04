@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import Cabecera from "./Cabecera";
+import CuadroDeMando from "./CuadroDeMando";
 import EstadoOdoo from "./EstadoOdoo";
 import Icono, { ICONOS_AREA } from "./Icono";
 import { fichar, reintentarOdoo } from "./fichaje/acciones";
@@ -89,10 +90,28 @@ const cuenta = (r: { count: number | null; error: unknown } | null) => (!r || r.
 const cifra = (n: number | null) => (n === null ? "—" : String(n));
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { perfil, veArea, puede, esDeSuPuesto, supabase, uid } = await usuarioActual();
+  const { perfil, veArea, enMenu, puede, esDeSuPuesto, supabase, uid } = await usuarioActual();
   const { ok, error } = await searchParams;
   const nombre = perfil?.nombre || perfil?.email || perfil?.codigo || "";
-  const mias = AREAS.filter((a) => veArea(a.id)).sort((a, b) => orden.indexOf(a.id) - orden.indexOf(b.id));
+  const mias = AREAS.filter((a) => enMenu(a.id)).sort((a, b) => orden.indexOf(a.id) - orden.indexOf(b.id));
+  const herramientas = <nav className="inicio-modulos" aria-label="Herramientas disponibles">
+    {mias.map((a) => <a key={a.id} className={`inicio-modulo ${a.id === "flota" ? "inicio-modulo-flota" : ""}`} href={a.ruta}>
+      <div className="inicio-modulo-top"><span className="inicio-icono"><Icono nombre={ICONOS_AREA[a.id] ?? "documento"} size={25} /></span><span>{detalles[a.id]?.etiqueta ?? "HERRAMIENTA"}</span><Icono nombre="flecha" size={19} /></div>
+      <h3>{detalles[a.id]?.titulo ?? a.nombre}</h3><p>{detalles[a.id]?.descripcion ?? a.descripcion}</p>
+    </a>)}
+  </nav>;
+
+  // Dirección: el inicio es el cuadro de mando de toda la empresa, no la vista de un puesto.
+  if (perfil?.activo && puede("direccion.ver")) {
+    return <>
+      <Cabecera nombre={nombre} admin={veArea("admin")} />
+      <main className="contenido inicio-contenido">
+        {ok && <p className="aviso" role="status">{ok}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
+        <CuadroDeMando uid={uid} puedeFichar={puede("fichaje.fichar")} herramientas={herramientas} />
+      </main>
+    </>;
+  }
   const puedeJornada = puede("fichaje.fichar", "chofer.usar");
   const semana = inicioSemana();
   const ayer = inicioDia(1);
@@ -227,12 +246,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
         </>}
 
         <div className="inicio-seccion-heading"><div><h2>Tus herramientas</h2><p>Accesos para el trabajo de cada día.</p></div><span>{mias.length} disponibles</span></div>
-        <nav className="inicio-modulos" aria-label="Herramientas disponibles">
-          {mias.map((a) => <a key={a.id} className={`inicio-modulo ${a.id === "flota" ? "inicio-modulo-flota" : ""}`} href={a.ruta}>
-            <div className="inicio-modulo-top"><span className="inicio-icono"><Icono nombre={ICONOS_AREA[a.id] ?? "documento"} size={25} /></span><span>{detalles[a.id]?.etiqueta ?? "HERRAMIENTA"}</span><Icono nombre="flecha" size={19} /></div>
-            <h3>{detalles[a.id]?.titulo ?? a.nombre}</h3><p>{detalles[a.id]?.descripcion ?? a.descripcion}</p>
-          </a>)}
-        </nav>
+        {herramientas}
         <footer className="inicio-pie"><span className="shell-brand-line" /><span>Grupo Trimodos</span><span>Conectamos personas, movemos soluciones.</span></footer>
       </>}
     </main>

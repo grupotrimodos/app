@@ -2,6 +2,13 @@
   "_comentario": "Catálogo ÚNICO de áreas y permisos. Cada función nueva añade aquí su área y sus permisos: aparecen solos en el editor de perfiles y en el inicio. Quien tenga cualquier permiso de un área ve su tarjeta en el inicio. Los mismos identificadores se usan en la base de datos (RLS) y en la API Python (requiere_permiso).",
   "areas": [
     {
+      "id": "direccion", "nombre": "Cuadro de mando", "ruta": "/",
+      "descripcion": "Métricas resumidas de toda la empresa: personas, operación, seguridad y comercial (Odoo).",
+      "permisos": [
+        { "id": "direccion.ver", "nombre": "Ver el cuadro de mando de dirección: cifras de toda la empresa, incluidas ventas, facturación y cobros de Odoo" }
+      ]
+    },
+    {
       "id": "flota", "nombre": "Centro de flota", "ruta": "/flota",
       "descripcion": "Ubicación, actividad, combustible y recorridos de los vehículos conectados a Movildata.",
       "permisos": [

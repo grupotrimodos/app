@@ -12,8 +12,8 @@ export default async function Cabecera({ nombre }: { nombre?: string; admin?: bo
       <span>Personas · Transporte · Logística</span>
     </header>;
   }
-  const [{ veArea }, { total }] = await Promise.all([usuarioActual(), misPendientes()]);
-  const areas = AREAS.filter((a) => veArea(a.id)).map(({ id, nombre, ruta }) => ({ id, nombre, ruta }));
+  const [{ enMenu }, { total }] = await Promise.all([usuarioActual(), misPendientes()]);
+  const areas = AREAS.filter((a) => enMenu(a.id)).map(({ id, nombre, ruta }) => ({ id, nombre, ruta }));
   const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "GT";
   return (
     <div className="app-shell">

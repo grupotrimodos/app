@@ -24,6 +24,8 @@ LEAVE_TYPE_MODEL = "hr.leave.type"   # tipos de ausencia (se eligen solos por su
 EMPLOYEE_MODEL = "hr.employee"       # enlazar cada persona de la app con su ficha de empleado
 FLEET_MODEL = "fleet.vehicle"        # flota: se importan los camiones
 MODULE_MODEL = "ir.module.module"    # qué aplicaciones de Odoo están instaladas (decide a dónde va cada dato)
+CRM_MODEL = "crm.lead"              # cuadro de mando: oportunidades (solo totales)
+INVOICE_MODEL = "account.move"      # cuadro de mando: facturado y pendiente de cobro (solo totales)
 
 TASK_FIELDS = ["name", "company_id", "stage_id", "is_transport_order", "tms_package_ids", "tms_transport_order_attachment_id"]
 PACKAGE_FIELDS = [
@@ -58,6 +60,10 @@ ALLOWED_CALLS = {
     (EMPLOYEE_MODEL, "search_read"),    # solo vía buscar_empleado
     (FLEET_MODEL, "search_read"),       # solo vía vehiculos_flota
     (MODULE_MODEL, "search_read"),      # solo vía modulos_instalados
+    # Cuadro de mando de dirección: SOLO totales agrupados (read_group), nunca registros sueltos ni escrituras
+    (CRM_MODEL, "read_group"),          # solo vía crm_* 
+    (ORDER_MODEL, "read_group"),        # solo vía ventas
+    (INVOICE_MODEL, "read_group"),      # solo vía facturado y por_cobrar
 }
 
 # Permisos que se comprueban sin ejecutar nada: (modelo, operación, ¿debería tenerlo el usuario técnico?)
@@ -73,6 +79,7 @@ EXPECTED_PERMISSIONS = [
     (ATTENDANCE_MODEL, "unlink", False),
     (LEAVE_MODEL, "create", True), (LEAVE_MODEL, "unlink", False),
     (EMPLOYEE_MODEL, "read", True), (EMPLOYEE_MODEL, "write", False), (EMPLOYEE_MODEL, "unlink", False),
+    (CRM_MODEL, "read", True), (INVOICE_MODEL, "read", True),   # cuadro de mando (solo lectura)
 ]
 ALLOWED_CALLS |= {(m, "check_access_rights") for m, _, _ in EXPECTED_PERMISSIONS}
 
@@ -183,6 +190,43 @@ class OdooClient:
         except Exception:
             return None
         return {r["name"] for r in rows}
+
+    # ---- cuadro de mando: solo totales por grupo (read_group), de las empresas configuradas --------------------
+    def _totales(self, model: str, domain: list, campo: str, agrupar: str = "company_id", sin_empresa: bool = False) -> list[dict]:
+        empresa = ["|", ["company_id", "=", False], ["company_id", "in", self.s.company_ids]] if sin_empresa \
+            else [["company_id", "in", self.s.company_ids]]
+        filas = self._call(model, "read_group", [domain + empresa, [f"{campo}:sum"], [agrupar]], {"lazy": False})
+        return [{"grupo": f[agrupar][1] if isinstance(f.get(agrupar), list) else "Sin asignar",
+                 "n": int(f.get("__count") or 0), "importe": float(f.get(campo) or 0)} for f in filas]
+
+    def crm_abiertas_por_etapa(self) -> list[dict]:
+        """Oportunidades abiertas (ni ganadas ni perdidas) y su ingreso esperado, por etapa del embudo."""
+        return self._totales(CRM_MODEL, [["type", "=", "opportunity"], ["active", "=", True], ["probability", "<", 100]],
+                             "expected_revenue", "stage_id", sin_empresa=True)
+
+    def crm_ganadas(self, desde: str) -> list[dict]:
+        return self._totales(CRM_MODEL, [["type", "=", "opportunity"], ["probability", "=", 100], ["date_closed", ">=", desde]],
+                             "expected_revenue", sin_empresa=True)
+
+    def crm_nuevas(self, desde: str) -> list[dict]:
+        return self._totales(CRM_MODEL, [["type", "=", "opportunity"], ["create_date", ">=", desde]], "expected_revenue", sin_empresa=True)
+
+    def ventas(self, desde: str, hasta: str) -> list[dict]:
+        """Pedidos de venta confirmados (base imponible) entre dos fechas, por empresa."""
+        return self._totales(ORDER_MODEL, [["state", "in", ["sale", "done"]], ["date_order", ">=", desde], ["date_order", "<", hasta]],
+                             "amount_untaxed")
+
+    def facturado(self, desde: str, hasta: str) -> list[dict]:
+        """Facturas y abonos de cliente publicados (base imponible, los abonos restan), por empresa."""
+        return self._totales(INVOICE_MODEL, [["move_type", "in", ["out_invoice", "out_refund"]], ["state", "=", "posted"],
+                                             ["invoice_date", ">=", desde], ["invoice_date", "<", hasta]], "amount_untaxed_signed")
+
+    def por_cobrar(self, vencido_antes_de: str | None = None) -> list[dict]:
+        """Importe pendiente de cobro de facturas de cliente publicadas; con fecha, solo lo ya vencido."""
+        domain = [["move_type", "=", "out_invoice"], ["state", "=", "posted"], ["payment_state", "in", ["not_paid", "partial"]]]
+        if vencido_antes_de:
+            domain.append(["invoice_date_due", "<", vencido_antes_de])
+        return self._totales(INVOICE_MODEL, domain, "amount_residual_signed")
 
     def buscar_empleado(self, correo: str | None = None, credencial: str | None = None) -> list[dict]:
         """Empleados activos con ese correo de trabajo o ese código de credencial (campo «barcode»)."""

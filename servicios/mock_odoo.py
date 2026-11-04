@@ -130,9 +130,34 @@ class MockOdoo:
         return i
 
     # ---- lecturas de la sincronización automática
-    instalados = {"hr", "hr_attendance", "hr_holidays", "fleet"}
+    instalados = {"hr", "hr_attendance", "hr_holidays", "fleet", "crm", "sale", "account"}
     empleados = [{"id": 41, "name": "Ana Conductora", "work_email": "ana@grupotrimodos.com", "barcode": "C001"},
                  {"id": 7, "name": "Jefa de tráfico", "work_email": "jefa@grupotrimodos.com", "barcode": None}]
+
+    # ---- cuadro de mando (datos de ejemplo: en pantalla se marcan como de prueba) ----
+    EMPRESAS = ("STINSA", "TRANSARGI S.L.U")
+
+    def _por_empresa(self, importes, cuentas):
+        return [{"grupo": e, "n": n, "importe": float(i)} for e, i, n in zip(self.EMPRESAS, importes, cuentas)]
+
+    def crm_abiertas_por_etapa(self):
+        return [{"grupo": g, "n": n, "importe": float(i)} for g, n, i in
+                (("Nueva", 14, 86000), ("Calificada", 9, 124500), ("Propuesta", 6, 98200), ("Negociación", 3, 61000))]
+
+    def crm_ganadas(self, desde):
+        return self._por_empresa((42300, 18750), (3, 2))
+
+    def crm_nuevas(self, desde):
+        return self._por_empresa((51000, 23400), (7, 4))
+
+    def ventas(self, desde, hasta):
+        return self._por_empresa((312450.5, 148900), (61, 37))
+
+    def facturado(self, desde, hasta):
+        return self._por_empresa((287300, 139420.75), (54, 33))
+
+    def por_cobrar(self, vencido_antes_de=None):
+        return self._por_empresa((48200, 21950), (12, 6)) if vencido_antes_de else self._por_empresa((196400, 88730), (71, 40))
 
     def modulos_instalados(self, nombres):
         return {n for n in nombres if n in self.instalados}

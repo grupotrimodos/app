@@ -14,6 +14,9 @@ export type Perfil = {
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
+/** Áreas personales de un puesto: no se enseñan a quien solo las tiene por ser superadministrador. */
+const AREAS_DEL_PUESTO = new Set(["chofer", "documentos"]);
+
 /** Usuario con sesión, su fila de «usuarios» y sus permisos (los de todos sus perfiles). Sin sesión, al login. */
 export const usuarioActual = cache(async function usuarioActual() {
   const supabase = await createClient();
@@ -33,7 +36,11 @@ export const usuarioActual = cache(async function usuarioActual() {
   const esDeSuPuesto = (...ps: string[]) => ps.some((p) => propios.has(p));
   /** ¿Tiene algún permiso de esta área? (tarjeta del inicio y acceso a su página) */
   const veArea = (area: string) => puede(...permisosDe(area));
-  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, veArea };
+  /** ¿Sale en su menú? Lo personal de un puesto (su camión, su documentación) solo a quien tiene ese puesto: al
+   *  superadministrador no se le llena el menú con lo de otros. El cuadro de mando es el propio inicio. */
+  const enMenu = (area: string) =>
+    area !== "direccion" && (AREAS_DEL_PUESTO.has(area) ? esDeSuPuesto(...permisosDe(area)) : veArea(area));
+  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, veArea, enMenu };
 });
 
 /** Usuario activo con alguno de los permisos indicados; si no, vuelve al inicio. */

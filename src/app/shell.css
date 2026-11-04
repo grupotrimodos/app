@@ -237,3 +237,89 @@ a.inicio-kpi:hover { border-color: #8fa5b9; box-shadow: 0 7px 21px #18273709; }
   .login-presentacion h1 { font-size: 38px; }
   .login-campos { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* ================= Cuadro de mando de dirección ================= */
+/* Lectura en «Z»: cifras clave arriba, después personas por centro y lo pendiente, y abajo comercial, flota y seguridad.
+   Una franja de color en cada cifra dice si va bien (verde), si hay que mirarla (ámbar) o si es urgente (rojo). */
+.cm { display: grid; gap: 30px; }
+.cm-cabecera { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.cm-cabecera h1 { font-size: clamp(28px, 2.7vw, 36px); margin: 0 0 6px; }
+.cm-fecha { color: #617082; font-size: 13px; margin: 0; }
+.cm-fecha span { display: inline-block; }
+.cm-fecha span::first-letter { text-transform: uppercase; }
+.cm-mi-jornada { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: white; border: 1px solid #dfe6ec; border-radius: 12px; padding: 8px 10px 8px 14px; }
+.cm-mi-jornada form { margin: 0; }
+.cm-mi-jornada .btn { min-height: 38px; font-size: 13px; padding: 6px 12px; }
+.cm-enlace { font-size: 13px; font-weight: 600; color: #345c7e; text-decoration: none; }
+.cm-enlace:hover { text-decoration: underline; }
+.cm-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.cm-cifras-clave { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.cm-cifras-tres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cm-cifra { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 118px; padding: 16px 18px; overflow: hidden; background: white; border: 1px solid #dfe6ec; border-radius: 12px; color: #182737; text-decoration: none; transition: border-color .18s, box-shadow .18s; }
+a.cm-cifra:hover { border-color: #8fa5b9; box-shadow: 0 7px 21px #18273709; }
+.cm-cifra::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; }
+.cm-cifra.bien::before { background: #26986f; }
+.cm-cifra.atencion::before { background: #c29a12; }
+.cm-cifra.alerta::before { background: #b52b3b; }
+.cm-cifra-titulo { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #617082; }
+.cm-cifra strong { margin-top: auto; font-size: 26px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cm-cifra.alerta strong { color: var(--error); }
+.cm-cifra-detalle { font-size: 12px; line-height: 1.4; color: #617082; }
+.cm-barra { height: 5px; overflow: hidden; border-radius: 3px; background: #edf1f5; }
+.cm-barra i { display: block; height: 100%; border-radius: inherit; background: #182d3e; }
+.cm-seccion { display: grid; gap: 12px; min-width: 0; }
+.cm-seccion-cabecera { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid #e0e6ec; }
+.cm-seccion-cabecera h2 { font-size: 18px; margin: 0; }
+.cm-nota { font-size: 12px; color: #7b8996; }
+.cm-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.cm-dos-ancho { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); }
+.cm-panel { min-width: 0; padding: 16px 18px; background: white; border: 1px solid #dfe6ec; border-radius: 12px; }
+.cm-panel h3 { font-size: 15px; margin: 0 0 12px; }
+.cm-tabla-caja { overflow-x: auto; }
+.cm-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.cm-tabla th, .cm-tabla td { padding: 9px 10px; white-space: nowrap; }
+.cm-tabla td:first-child { white-space: normal; }
+.cm-tabla small { color: #7b8996; }
+.cm-vacio td { color: #9aa7b3; }
+.cm-atencion { color: #8a6b0a; font-weight: 700; }
+.cm-mal { color: var(--error); font-weight: 700; }
+.cm-gris { color: #9aa7b3; }
+.cm-lista { list-style: none; padding: 0; margin: 0; }
+.cm-lista a { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 46px; padding: 8px 4px; border-bottom: 1px solid #eef1f4; color: #182737; text-decoration: none; font-size: 14px; }
+.cm-lista-fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 46px; padding: 8px 4px; border-bottom: 1px solid #eef1f4; font-size: 14px; }
+.cm-lista li:last-child a, .cm-lista li:last-child .cm-lista-fila { border-bottom: 0; }
+.cm-lista a:hover { color: #345c7e; }
+.cm-lista b { min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+.cm-barras { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
+.cm-barras li { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13.5px; }
+.cm-barras-etiqueta { display: grid; font-weight: 600; }
+.cm-barras-etiqueta small { font-size: 12px; font-weight: 400; color: #7b8996; }
+.cm-barras-pista { height: 10px; overflow: hidden; border-radius: 5px; background: #edf1f5; }
+.cm-barras-pista i { display: block; height: 100%; border-radius: inherit; background: #fcda00; }
+.cm-barras-valor { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cm-aviso { margin: 0; padding: 9px 12px; font-size: 13px; color: #6f5710; background: #fff9dd; border: 1px solid #eee1a6; border-radius: 10px; }
+.cm-cargando { margin: 0; padding: 20px; font-size: 13px; color: #7b8996; background: white; border: 1px dashed #dfe6ec; border-radius: 12px; }
+.cm-pie { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 12px; color: #7b8996; }
+@media (max-width: 1190px) {
+  .cm-cifras-clave { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cm-dos-ancho { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .cm-dos { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  /* En el cuadro de mando las tablas siguen siendo tablas (se deslizan de lado), no fichas: se comparan columnas. */
+  .cm-tabla { display: table; min-width: 560px; }
+  .cm-tabla thead { display: table-header-group; }
+  .cm-tabla tbody { display: table-row-group; }
+  .cm-tabla tr { display: table-row; padding: 0; border-bottom: 0; }
+  .cm-tabla th, .cm-tabla td { display: table-cell; padding: 8px; border-bottom: 1px solid #eef1f4; }
+  .cm-tabla td { overflow-wrap: normal; }
+  .cm-tabla td:first-child { min-width: 140px; }
+  .cm { gap: 24px; }
+  .cm-cifras, .cm-cifras-clave { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cm-cifra { min-height: 104px; padding: 14px; }
+  .cm-cifra strong { font-size: 22px; }
+  .cm-barras li { grid-template-columns: minmax(0, 1fr) auto; }
+  .cm-barras-pista { grid-column: 1 / -1; order: 3; }
+}

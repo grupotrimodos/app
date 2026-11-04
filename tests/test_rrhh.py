@@ -338,3 +338,38 @@ def test_sin_clave_de_servidor_la_sincronizacion_lo_explica(entorno, monkeypatch
     monkeypatch.delenv("SUPABASE_SECRET_KEY")
     r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"})
     assert r.status_code == 503 and "SUPABASE_SECRET_KEY" in r.json()["error"]
+
+
+# ------------------------------------------------------------------ cuadro de mando de dirección (Odoo, solo totales)
+
+def test_cuadro_de_mando_solo_lee_totales_de_odoo():
+    from servicios.odoo_client import ALLOWED_CALLS
+    comerciales = {c for c in ALLOWED_CALLS if c[0] in ("crm.lead", "account.move") or c[1] == "read_group"}
+    assert comerciales == {("crm.lead", "read_group"), ("sale.order", "read_group"), ("account.move", "read_group"),
+                           ("crm.lead", "check_access_rights"), ("account.move", "check_access_rights")}
+    assert not any(m in ("write", "create", "unlink") for mod, m in ALLOWED_CALLS if mod in ("crm.lead", "account.move", "sale.order"))
+
+
+def test_cuadro_de_mando_exige_su_permiso_y_resume_por_empresa(entorno):
+    from servicios import direccion
+    sb, odoo, c = entorno
+    direccion._cache.clear()
+    assert c.get("/api/odoo/comercial", headers=ANA).status_code == 403          # Ana (chófer) no tiene el permiso
+    r = c.get("/api/odoo/comercial", headers={"Authorization": "Bearer tok-jefa"})   # superadministradora: todo
+    assert r.status_code == 200
+    d = r.json()
+    assert d["crm"]["abiertas"] == 32 and d["crm"]["valor"] == 369700
+    assert d["ventas"]["mes"] == 461350.5 and d["facturacion"]["vencido"] == 70150
+    assert [e["empresa"] for e in d["empresas"]] == ["STINSA", "TRANSARGI S.L.U"]
+    assert d["empresas"][0] == {"empresa": "STINSA", "ventas": 312450.5, "facturado": 287300, "por_cobrar": 196400, "vencido": 48200}
+
+
+def test_cuadro_de_mando_sigue_si_falta_una_aplicacion():
+    from datetime import date
+    from servicios import direccion
+    from servicios.mock_odoo import MockOdoo
+    odoo = MockOdoo()
+    odoo.instalados = {"crm"}
+    d = direccion.calcular(odoo, date(2026, 11, 4))
+    assert d["crm"]["ganadas_mes"] == 5 and d["ventas"] is None and d["facturacion"] is None
+    assert any("Ventas" in a for a in d["avisos"]) and any("Facturación" in a for a in d["avisos"])
