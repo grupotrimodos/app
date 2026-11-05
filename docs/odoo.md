@@ -1,5 +1,15 @@
 # Odoo
 
+**Producción: Odoo 18**, `https://stinsa18.tecnativa.net`, base `prod`, desde el 30-10-2026. Antes era Odoo 15, y parte
+del código y de los textos se escribió para la 15. Lo que cambia en la 18:
+- La analítica va en `analytic_distribution`. Ya no existen `analytic_account_id` ni `analytic_tag_ids` en los apuntes, ni
+  las etiquetas analíticas (`account.analytic.tag`). Las cifras por centro y el catálogo analítico de Administración
+  están escritos para la 15 y hay que adaptarlos. Están ocultos en el piloto.
+- `message_post` necesita `body_is_html=True`; la app ya lo envía en la 18.
+- Las claves API son de cada Odoo: una clave del Odoo 15 no entra en el 18. Se crean en *Mi perfil → Seguridad de la
+  cuenta → Nueva clave API*.
+- `scripts.comprobar_compatibilidad` revisa, solo leyendo, lo que la app usa de Odoo en una versión concreta.
+
 Odoo es la base de datos principal. Qué se puede leer y escribir: `AGENTS.md`, base 4. Todo pasa por `servicios/odoo_client.py` (lista blanca `ALLOWED_CALLS`); ARGON tiene su propia lista congelada.
 
 ## Leer y escribir en Odoo
@@ -70,4 +80,4 @@ Nadie tiene que decidir dónde va cada dato: `servicios/sincronizacion.py` tiene
   - `/api/odoo/analitica` (`admin.usuarios`): catálogo de cuentas y etiquetas analíticas para asignarlas a los centros.
   - `/api/odoo/comercial` (`direccion.ver`) añade las oportunidades ganadas y nuevas del mes anterior hasta el mismo día.
   - Todas aceptan `?empresa=<id>` (uno de `ODOO_COMPANY_IDS`; otro da error 400). Cada parte se calcula por separado: si falla o falta su aplicación, llega vacía con su aviso. Caché de 10 minutos (5 el comercial; 1 si algo falló). «Hoy» es el día de Madrid.
-  - **Permisos de lectura** del usuario técnico de Odoo (en las dos empresas): facturas y apuntes (`account.move`, `account.move.line`), pedidos y sus líneas (`sale.order`, `sale.order.line`, de **todos** los comerciales, no «solo sus documentos»), cuentas y etiquetas analíticas (`account.analytic.account`, `account.analytic.tag`) y empresas (`res.company`). `scripts.comprobar_permisos` ya los comprueba. Odoo 15: las etiquetas analíticas desaparecen en Odoo 16 (allí habría que leer `analytic_distribution`).
+  - **Permisos de lectura** del usuario técnico de Odoo (en las dos empresas): facturas y apuntes (`account.move`, `account.move.line`), pedidos y sus líneas (`sale.order`, `sale.order.line`, de **todos** los comerciales, no «solo sus documentos»), cuentas y etiquetas analíticas (`account.analytic.account`, `account.analytic.tag`) y empresas (`res.company`). `scripts.comprobar_permisos` ya los comprueba. Escrito para Odoo 15: en producción (Odoo 18) ya no hay etiquetas analíticas y la analítica va en `analytic_distribution` (ver arriba).

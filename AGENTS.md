@@ -5,7 +5,9 @@ cambiar una función.
 
 ## Bases del proyecto
 
-1. **Odoo es la base de datos principal y manda en el presente:** empleados, fichajes, vacaciones y su saldo, clientes,
+1. **Odoo es la base de datos principal y manda en el presente.** Producción es **Odoo 18**
+   (`https://stinsa18.tecnativa.net`, base `prod`) desde el 30-10-2026; el Odoo 15 anterior ya no se usa. Datos que
+   guarda: empleados, fichajes, vacaciones y su saldo, clientes,
    proveedores, viajes (tms), stock, facturas, **chóferes, flota y la documentación de ambos** (carnés, CAP, tarjeta de
    tacógrafo, ITV, seguros…). Lo que existe en Odoo se lee y se escribe en Odoo, sin copias que se editen.
 2. **Movildata se consulta en directo** (posición, actividad, tacógrafo).
