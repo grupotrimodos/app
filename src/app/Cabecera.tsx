@@ -14,7 +14,8 @@ export default async function Cabecera({ nombre }: { nombre?: string; admin?: bo
   }
   const [{ enMenu }, { total }] = await Promise.all([usuarioActual(), misPendientes()]);
   const areas = AREAS.filter((a) => enMenu(a.id)).map(({ id, nombre, ruta }) => ({ id, nombre, ruta }));
-  const iniciales = nombre.trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "GT";
+  // Iniciales de las dos primeras palabras con letras (un «(ejemplo)» o un número no cuentan).
+  const iniciales = nombre.trim().split(/\s+/).filter((p) => /^\p{L}/u.test(p)).slice(0, 2).map((p) => p[0]).join("").toUpperCase() || "GT";
   return (
     <div className="app-shell">
       <a className="shell-skip" href="#contenido-principal">Ir al contenido</a>
