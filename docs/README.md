@@ -13,3 +13,4 @@ Reglas y bases del proyecto: [`../AGENTS.md`](../AGENTS.md). Puesta en marcha: [
 | [argon.md](argon.md) | ARGON: pedidos de Carburos desde n8n |
 | [otras-funciones.md](otras-funciones.md) | Seguridad, cuadro de mando, ropa, zonas y calendario (ocultas en el piloto) |
 | [nueva-funcion.md](nueva-funcion.md) | Cómo se añade una función (fuera del piloto) |
+| [scripts.md](scripts.md) | Para qué sirve cada script |

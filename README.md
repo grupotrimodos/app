@@ -40,3 +40,5 @@ despliega (preguntar antes). La configuración que se hace una sola vez (Supabas
 npx tsc --noEmit && npx next build                         # web
 .venv/bin/python -X utf8 -m scripts.prueba_navegador       # si se toca DECA (navegador real, arranca web y API)
 ```
+
+Para qué sirve cada script de `scripts/`: [`docs/scripts.md`](docs/scripts.md).
