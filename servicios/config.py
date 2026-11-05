@@ -1,10 +1,18 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-# ENV_FILE permite apuntar a otro Odoo sin tocar el .env de producción (p. ej. ENV_FILE=.env.odoo18)
-load_dotenv(os.environ.get("ENV_FILE") or None)
+# En local, la API lee .env y el mismo .env.local que la web (lo que ya esté en el entorno o en .env manda).
+# ENV_FILE permite apuntar a otro archivo (p. ej. ENV_FILE=.env.odoo18); los tests lo fijan a «ninguno».
+# En Vercel no hay archivos: todo llega del entorno.
+_RAIZ = Path(__file__).resolve().parent.parent
+if os.environ.get("ENV_FILE"):
+    load_dotenv(os.environ["ENV_FILE"])
+else:
+    load_dotenv(_RAIZ / ".env")
+    load_dotenv(_RAIZ / ".env.local")
 
 
 def _bool(value: str | None, default: bool) -> bool:

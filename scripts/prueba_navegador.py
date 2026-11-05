@@ -66,8 +66,11 @@ comprobar.fallos = 0
 def main():
     video = Path(tempfile.gettempdir()) / "qr_camara.y4m"
     crear_video_qr(video, QR_TEXT)
+    # Sin Supabase aunque esté en .env.local: vacías en el entorno (Next no las pisa con sus archivos) y la API sin
+    # leer archivos de entorno.
     env = {k: v for k, v in os.environ.items() if "SUPABASE" not in k}
-    env.update({"ODOO_MODE": "mock", "DRY_RUN": "false", "NEXT_TELEMETRY_DISABLED": "1"})
+    env.update({"ODOO_MODE": "mock", "DRY_RUN": "false", "NEXT_TELEMETRY_DISABLED": "1", "ENV_FILE": os.devnull,
+                "NEXT_PUBLIC_SUPABASE_URL": "", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "", "SUPABASE_SECRET_KEY": ""})
     api = subprocess.Popen([sys.executable, "-m", "uvicorn", "servicios.main:app", "--port", "8000"], cwd=ROOT, env=env,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     npx = "npx.cmd" if sys.platform == "win32" else "npx"

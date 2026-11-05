@@ -69,7 +69,7 @@ No hace falta configurar nada: los da de alta un administrador desde **Administr
 
 ### 1.6 Vercel
 1. *Add New Project* → importar `grupotrimodos/app`. Vercel detecta **Next.js** solo; la función Python de `api/index.py` se publica en el mismo proyecto.
-2. *Settings → Environment Variables*: todas las de `.env.example`, marcando como **Sensitive** las secretas (`SUPABASE_SECRET_KEY`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `SECRET_KEY`, `ARGON_CLAVE`, `ARGON_ODOO_PASSWORD`, `CRON_SECRET`, `MOVILDATA_API_KEY`). Los cambios de variables se aplican con un **Redeploy**.
+2. *Settings → Environment Variables*: todas las de `.env.example`, marcando como **Sensitive** las secretas (`SUPABASE_SECRET_KEY`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `SECRET_KEY`, `ARGON_CLAVE`, `ARGON_ODOO_PASSWORD`, `CRON_SECRET`, `MOVILDATA_API_KEY`, `AZURE_CLIENT_SECRET`). Los cambios de variables se aplican con un **Redeploy**.
 3. *Settings → Deployment Protection*: desactivar *Vercel Authentication* (la app ya tiene su propio login).
 4. *Settings → Domains*: añadir el subdominio (p. ej. `app.grupotrimodos.com`).
 5. **Uso con personal de la empresa = plan Pro** (el plan Hobby es solo para uso personal y no comercial).
@@ -90,7 +90,7 @@ ARGON mantiene su dirección: `POST https://<dominio>/api/argon/procesar` con la
   # Windows:  .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
   # Mac:      .venv/bin/python -m pip install -r requirements-dev.txt
   ```
-- Copia `.env.example` como **`.env.local`** (parte web) y como **`.env`** (API Python) y rellénalos. **Nunca se suben a git.**
+- Copia `.env.example` como **`.env.local`** y rellénalo: lo leen la web y la API Python. **Nunca se sube a git.** Los tests no leen ningún archivo de entorno (`tests/conftest.py`), así que unas claves reales en `.env.local` nunca llegan a Odoo ni a Movildata desde una prueba.
 
 ### Cada vez
 ```bash
