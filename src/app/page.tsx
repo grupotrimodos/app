@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Cabecera from "./Cabecera";
 import CuadroDeMando from "./CuadroDeMando";
+import InicioCampo from "./InicioCampo";
 import EstadoOdoo from "./EstadoOdoo";
 import Icono, { ICONOS_AREA } from "./Icono";
 import { fichar, reintentarOdoo } from "./fichaje/acciones";
@@ -89,9 +90,9 @@ async function AgendaHoy({ uid }: { uid: string }) {
 const cuenta = (r: { count: number | null; error: unknown } | null) => (!r || r.error ? null : r.count ?? 0);
 const cifra = (n: number | null) => (n === null ? "—" : String(n));
 
-export default async function Inicio({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { perfil, veArea, enMenu, puede, esDeSuPuesto, supabase, uid } = await usuarioActual();
-  const { ok, error } = await searchParams;
+export default async function Inicio({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string; ver?: string; empresa?: string }> }) {
+  const { perfil, enMenu, puede, esDeSuPuesto, supabase, uid, pantalla } = await usuarioActual();
+  const { ok, error, ver, empresa } = await searchParams;
   const nombre = perfil?.nombre || perfil?.email || perfil?.codigo || "";
   const mias = AREAS.filter((a) => enMenu(a.id)).sort((a, b) => orden.indexOf(a.id) - orden.indexOf(b.id));
   const herramientas = <nav className="inicio-modulos" aria-label="Herramientas disponibles">
@@ -101,15 +102,22 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     </a>)}
   </nav>;
 
-  // Dirección: el inicio es el cuadro de mando de toda la empresa, no la vista de un puesto.
-  if (perfil?.activo && puede("direccion.ver")) {
+  // Cada perfil entra en su pantalla. Dirección: el cuadro de mando de toda la empresa (sin fichar ni flota).
+  if (pantalla === "direccion" && puede("direccion.ver")) {
     return <>
-      <Cabecera nombre={nombre} admin={veArea("admin")} />
+      <Cabecera nombre={nombre} />
       <main className="contenido inicio-contenido">
         {ok && <p className="aviso" role="status">{ok}</p>}
         {error && <p className="error" role="alert">{error}</p>}
-        <CuadroDeMando uid={uid} puedeFichar={puede("fichaje.fichar")} herramientas={herramientas} />
+        <CuadroDeMando ver={ver} empresa={empresa} base="/" />
       </main>
+    </>;
+  }
+  // Chóferes y operarios: una sola pantalla en el móvil, sin menú.
+  if (pantalla === "campo") {
+    return <>
+      <Cabecera nombre={nombre} />
+      <main className="contenido campo-contenido"><InicioCampo nombre={nombre} ok={ok} error={error} /></main>
     </>;
   }
   const puedeJornada = puede("fichaje.fichar", "chofer.usar");
@@ -183,7 +191,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const hoyTexto = ahora.toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long" });
 
   return <>
-    <Cabecera nombre={nombre} admin={veArea("admin")} />
+    <Cabecera nombre={nombre} />
     <main className="contenido inicio-contenido">
       <div className="inicio-bienvenida">
         <div><p className="inicio-antetitulo">GRUPO TRIMODOS · CENTRO DE TRABAJO</p>

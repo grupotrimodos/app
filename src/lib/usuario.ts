@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { TODOS_LOS_PERMISOS, permisosDe } from "@/lib/permisos";
+import { AREAS, DE_PUESTO, RANGO_PANTALLA, TODOS_LOS_PERMISOS, permisosDe, type Pantalla } from "@/lib/permisos";
 
 export type Perfil = {
   id: string;
@@ -14,18 +14,17 @@ export type Perfil = {
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** Áreas personales de un puesto: no se enseñan a quien solo las tiene por ser superadministrador. */
-const AREAS_DEL_PUESTO = new Set(["chofer", "documentos"]);
-
-/** Usuario con sesión, su fila de «usuarios» y sus permisos (los de todos sus perfiles). Sin sesión, al login. */
+/** Usuario con sesión, su fila de «usuarios», sus permisos (los de todos sus perfiles) y su pantalla. Sin sesión, al login. */
 export const usuarioActual = cache(async function usuarioActual() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const uid = data?.claims?.sub;
   if (!uid) redirect("/login");
-  const [{ data: perfil }, { data: lista }] = await Promise.all([
+  const [{ data: perfil }, { data: lista }, { data: suyos }] = await Promise.all([
     supabase.from("usuarios").select("id,nombre,email,codigo,activo,es_admin").eq("id", uid).maybeSingle<Perfil>(),
     supabase.rpc("mis_permisos"),
+    supabase.from("usuario_perfil").select("perfiles(pantalla)").eq("usuario_id", uid)
+      .returns<{ perfiles: { pantalla: Pantalla | null } | null }[]>(),
   ]);
   /** Los de sus perfiles: dicen qué hace en su puesto (un superadministrador puede todo, pero no por eso conduce). */
   const propios = new Set<string>(!perfil?.activo ? [] : ((lista as string[] | null) ?? []));
@@ -34,13 +33,22 @@ export const usuarioActual = cache(async function usuarioActual() {
   const puede = (...ps: string[]) => ps.some((p) => permisos.has(p));
   /** ¿Tiene alguno de estos permisos en sus perfiles? Para lo personal del puesto: su camión, su documentación. */
   const esDeSuPuesto = (...ps: string[]) => ps.some((p) => propios.has(p));
-  /** ¿Tiene algún permiso de esta área? (tarjeta del inicio y acceso a su página) */
+  /** ¿Tiene algún permiso de esta área? (acceso a su página) */
   const veArea = (area: string) => puede(...permisosDe(area));
-  /** ¿Sale en su menú? Lo personal de un puesto (su camión, su documentación) solo a quien tiene ese puesto: al
-   *  superadministrador no se le llena el menú con lo de otros. El cuadro de mando es el propio inicio. */
-  const enMenu = (area: string) =>
-    area !== "direccion" && (AREAS_DEL_PUESTO.has(area) ? esDeSuPuesto(...permisosDe(area)) : veArea(area));
-  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, veArea, enMenu };
+  /** ¿Sale en su menú? Los permisos de gestión cuentan siempre; los del trabajo propio (fichar, la flota, DECA…), solo si
+   *  vienen de sus perfiles: al superadministrador no se le llena el menú con lo de otros puestos. */
+  const enMenu = (area: string) => {
+    const a = AREAS.find((x) => x.id === area);
+    if (!a || (area === "direccion" && pantalla === "direccion")) return false;   // en dirección, el cuadro es el inicio
+    return a.permisos.some((p) => (DE_PUESTO.has(p.id) ? propios.has(p.id) : permisos.has(p.id)));
+  };
+  /** Qué ve al entrar: la pantalla de más alcance de sus perfiles. Sin puesto pero con complementos (Seguridad…), la de
+   *  oficina; el superadministrador sin perfiles, la de dirección; sin nada, ninguna (pantalla de «preparando tu acceso»). */
+  const pantallas = (suyos ?? []).map((f) => f.perfiles?.pantalla).filter((p): p is Pantalla => !!p);
+  const pantalla: Pantalla | null = !perfil?.activo ? null
+    : pantallas.length ? pantallas.reduce((a, b) => (RANGO_PANTALLA[b] > RANGO_PANTALLA[a] ? b : a))
+    : perfil.es_admin ? "direccion" : propios.size ? "oficina" : null;
+  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, veArea, enMenu, pantalla };
 });
 
 /** Usuario activo con alguno de los permisos indicados; si no, vuelve al inicio. */

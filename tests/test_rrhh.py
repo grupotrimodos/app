@@ -346,8 +346,17 @@ def test_cuadro_de_mando_solo_lee_totales_de_odoo():
     from servicios.odoo_client import ALLOWED_CALLS
     comerciales = {c for c in ALLOWED_CALLS if c[0] in ("crm.lead", "account.move") or c[1] == "read_group"}
     assert comerciales == {("crm.lead", "read_group"), ("sale.order", "read_group"), ("account.move", "read_group"),
+                           ("sale.order.line", "read_group"), ("account.move.line", "read_group"),
                            ("crm.lead", "check_access_rights"), ("account.move", "check_access_rights")}
-    assert not any(m in ("write", "create", "unlink") for mod, m in ALLOWED_CALLS if mod in ("crm.lead", "account.move", "sale.order"))
+    # finanzas y centros: líneas de pedido y apuntes, solo agrupados; catálogo analítico, solo lectura de id/nombre
+    finanzas = {c for c in ALLOWED_CALLS if c[0] in ("sale.order.line", "account.move.line") or c[0].startswith("account.analytic")}
+    assert finanzas == {("sale.order.line", "read_group"), ("account.move.line", "read_group"),
+                        ("account.analytic.account", "search_read"), ("account.analytic.tag", "search_read"),
+                        ("sale.order.line", "check_access_rights"), ("account.move.line", "check_access_rights"),
+                        ("account.analytic.account", "check_access_rights"), ("account.analytic.tag", "check_access_rights")}
+    solo_lectura = ("crm.lead", "account.move", "sale.order", "sale.order.line", "account.move.line",
+                    "account.analytic.account", "account.analytic.tag")
+    assert not any(m in ("write", "create", "unlink") for mod, m in ALLOWED_CALLS if mod in solo_lectura)
 
 
 def test_cuadro_de_mando_exige_su_permiso_y_resume_por_empresa(entorno):

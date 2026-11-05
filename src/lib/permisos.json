@@ -1,70 +1,73 @@
 {
-  "_comentario": "Catálogo ÚNICO de áreas y permisos. Cada función nueva añade aquí su área y sus permisos: aparecen solos en el editor de perfiles y en el inicio. Quien tenga cualquier permiso de un área ve su tarjeta en el inicio. Los mismos identificadores se usan en la base de datos (RLS) y en la API Python (requiere_permiso).",
+  "_comentario": "Catálogo ÚNICO de áreas y permisos. Cada función nueva añade aquí su área y sus permisos: aparecen solos en el editor de perfiles y en el menú. Los mismos identificadores se usan en la base de datos (RLS) y en la API Python (requiere_permiso). «de_puesto»: permiso para el trabajo propio (fichar, su camión, la flota…); solo pone su área en el menú si viene de los perfiles de la persona, no por ser superadministrador. Los demás son de gestión o dirección.",
   "areas": [
     {
-      "id": "direccion", "nombre": "Cuadro de mando", "ruta": "/",
-      "descripcion": "Métricas resumidas de toda la empresa: personas, operación, seguridad y comercial (Odoo).",
+      "id": "direccion", "nombre": "Cuadro de mando", "ruta": "/direccion",
+      "descripcion": "Métricas de toda la empresa: finanzas, centros, chóferes por zona, comercial y personas.",
       "permisos": [
-        { "id": "direccion.ver", "nombre": "Ver el cuadro de mando de dirección: cifras de toda la empresa, incluidas ventas, facturación y cobros de Odoo" }
+        { "id": "direccion.ver", "nombre": "Ver el cuadro de mando de dirección: personas, centros, chóferes por zona, seguridad y comercial (Odoo)" },
+        { "id": "direccion.finanzas", "nombre": "Ver las finanzas de Odoo: facturación, cobros y pagos pendientes, pendiente de facturar e ingresos y gastos por centro" }
       ]
     },
     {
       "id": "flota", "nombre": "Centro de flota", "ruta": "/flota",
       "descripcion": "Ubicación, actividad, combustible y recorridos de los vehículos conectados a Movildata.",
       "permisos": [
-        { "id": "flota.ver", "nombre": "Ver posición y actividad de toda la flota de Movildata (todos los centros)" }
+        { "id": "flota.ver", "nombre": "Ver posición y actividad de toda la flota de Movildata (todos los centros)", "de_puesto": true }
       ]
     },
     {
       "id": "fichaje", "nombre": "Fichaje", "ruta": "/fichaje",
       "descripcion": "Fichar la entrada, las pausas y la salida. Se anota en Odoo.",
       "permisos": [
-        { "id": "fichaje.fichar", "nombre": "Fichar su propia jornada" }
+        { "id": "fichaje.fichar", "nombre": "Fichar su propia jornada", "de_puesto": true }
       ]
     },
     {
       "id": "chofer", "nombre": "Mi camión", "ruta": "/chofer",
       "descripcion": "Confirmar el camión de hoy (tarjeta del tacógrafo), ver sus horas y empezar o terminar la jornada.",
       "permisos": [
-        { "id": "chofer.usar", "nombre": "Usar «Mi camión» (chóferes)" }
+        { "id": "chofer.usar", "nombre": "Usar «Mi camión» (chóferes)", "de_puesto": true }
       ]
     },
     {
       "id": "ausencias", "nombre": "Vacaciones y ausencias", "ruta": "/ausencias",
       "descripcion": "Pedir días y ver si están aprobados.",
       "permisos": [
-        { "id": "ausencias.pedir", "nombre": "Pedir vacaciones y ausencias" }
+        { "id": "ausencias.pedir", "nombre": "Pedir vacaciones y ausencias", "de_puesto": true }
       ]
     },
     {
       "id": "equipo", "nombre": "Mi equipo", "ruta": "/equipo",
-      "descripcion": "Quién ha fichado hoy, ausencias por aprobar y correcciones.",
+      "descripcion": "Quién ha fichado hoy, ausencias por aprobar, correcciones y chóferes por cliente o ruta.",
       "permisos": [
         { "id": "equipo.ver", "nombre": "Ver a las personas de sus centros (estado, fichajes, ausencias, camión)" },
         { "id": "ausencias.aprobar", "nombre": "Aprobar o rechazar ausencias de las personas de sus centros" },
-        { "id": "fichaje.corregir", "nombre": "Corregir fichajes de las personas de sus centros" }
+        { "id": "fichaje.corregir", "nombre": "Corregir fichajes de las personas de sus centros" },
+        { "id": "zonas.gestionar", "nombre": "Organizar a los chóferes de sus centros por cliente o ruta (zonas)" }
       ]
     },
     {
       "id": "documentos", "nombre": "Mi documentación", "ruta": "/documentos",
       "descripcion": "Tus carnés, certificados y reconocimientos, con su fecha de caducidad.",
       "permisos": [
-        { "id": "documentos.propios", "nombre": "Mantener al día su propia documentación (la que pide su perfil)" }
+        { "id": "documentos.propios", "nombre": "Mantener al día su propia documentación (la que pide su perfil)", "de_puesto": true }
       ]
     },
     {
       "id": "ropa", "nombre": "Ropa de trabajo", "ruta": "/ropa",
-      "descripcion": "Pide ropa de trabajo y EPIs; tu responsable la aprueba y te la entrega.",
+      "descripcion": "Dotación de ropa de cada temporada (dos mudas) y cambios por rotura, talla o pérdida.",
       "permisos": [
-        { "id": "ropa.pedir", "nombre": "Pedir ropa de trabajo y EPIs para uno mismo" },
-        { "id": "ropa.gestionar", "nombre": "Aprobar y entregar la ropa que piden las personas de sus centros" }
+        { "id": "ropa.pedir", "nombre": "Recibir su ropa de cada temporada, apuntar sus tallas y pedir cambios", "de_puesto": true },
+        { "id": "ropa.gestionar", "nombre": "Entregar la ropa de temporada y resolver los cambios de las personas de sus centros" },
+        { "id": "ropa.configurar", "nombre": "Decidir qué lleva la muda de cada puesto en verano y en invierno y cuántas mudas tocan" }
       ]
     },
     {
       "id": "incidencias", "nombre": "Incidencias", "ruta": "/incidencias",
       "descripcion": "Avisa de un accidente, un incidente o una avería y sigue en qué estado está.",
       "permisos": [
-        { "id": "incidencias.reportar", "nombre": "Reportar incidencias y ver las suyas" }
+        { "id": "incidencias.reportar", "nombre": "Reportar incidencias y ver las suyas", "de_puesto": true }
       ]
     },
     {
@@ -79,14 +82,14 @@
       "id": "deca", "nombre": "DECA · Orden de transporte", "ruta": "/deca/",
       "descripcion": "Corregir mercancía, bultos, euro palets y peso de la orden y descargar el PDF.",
       "permisos": [
-        { "id": "deca.usar", "nombre": "Corregir órdenes de transporte (DECA)" }
+        { "id": "deca.usar", "nombre": "Corregir órdenes de transporte (DECA)", "de_puesto": true }
       ]
     },
     {
       "id": "admin", "nombre": "Administración", "ruta": "/admin",
-      "descripcion": "Usuarios, perfiles, centros, camiones y sincronización con Odoo.",
+      "descripcion": "Personas, perfiles, centros, zonas, camiones y sincronización con Odoo.",
       "permisos": [
-        { "id": "admin.usuarios", "nombre": "Gestionar usuarios, perfiles y centros (puede dar cualquier permiso: solo para administración)" },
+        { "id": "admin.usuarios", "nombre": "Gestionar personas, perfiles, centros y su analítica de Odoo (puede dar cualquier permiso: solo para administración)" },
         { "id": "vehiculos.gestionar", "nombre": "Dar de alta y de baja camiones" },
         { "id": "admin.sincronizacion", "nombre": "Ver y lanzar la sincronización con Odoo" }
       ]

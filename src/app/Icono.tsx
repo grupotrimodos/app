@@ -24,6 +24,9 @@ const trazos: Record<string, ReactNode> = {
   campana: <><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4" /></>,
   ropa: <path d="M8.5 3 3 6l2 5 2.5-1V21h9V10l2.5 1 2-5-5.5-3a3.5 3.5 0 0 1-7 0Z" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  euro: <><path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h10M4 14h10" /></>,
+  edificio: <><path d="M4 21V4h11v17M15 9h5v12M2 21h20M8 8h3M8 12h3M8 16h3" /></>,
+  grafica: <><path d="M4 20V4M4 20h16M8 16v-4M12 16V8M16 16v-6" /></>,
 };
 
 /** Iconos propios, ligeros y sin dependencias. El texto del control aporta su nombre accesible. */
@@ -35,6 +38,6 @@ export default function Icono({ nombre, size = 22, className }: { nombre: string
 }
 
 export const ICONOS_AREA: Record<string, string> = {
-  flota: "flota", fichaje: "reloj", chofer: "camion", ausencias: "calendario", equipo: "equipo", deca: "documento", admin: "ajustes",
+  direccion: "actividad", flota: "flota", fichaje: "reloj", chofer: "camion", ausencias: "calendario", equipo: "equipo", deca: "documento", admin: "ajustes",
   documentos: "documento", incidencias: "aviso", seguridad: "escudo", ropa: "ropa",
 };

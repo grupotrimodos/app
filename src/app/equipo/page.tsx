@@ -103,7 +103,8 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
     <>
       <Cabecera nombre={perfil.nombre || perfil.email || ""} admin={veArea("admin")} />
       <main className="contenido">
-        <h1>Mi equipo</h1>
+        <div className="admin-cabecera"><h1>Mi equipo</h1>
+          {puede("zonas.gestionar") && <Link className="btn pequeno" href="/equipo/zonas">Chóferes por cliente o ruta</Link>}</div>
         {centros.length > 1 && (
           <nav className="chips" style={{ margin: "8px 0 16px" }} aria-label="Centro">
             {centros.map((c) => (
