@@ -24,8 +24,9 @@ import httpx
 log = logging.getLogger("conductores")
 MADRID = ZoneInfo("Europe/Madrid")
 # Algunas cuentas devuelven la lista dentro de un objeto: estos son los nombres habituales del envoltorio.
-ENVOLTORIOS = ("Data", "data", "Datos", "datos", "Result", "result", "Resultado", "resultado", "Items", "items",
-               "Vehiculos", "vehiculos", "Value", "value", "Lista", "lista")
+# GetLastLocations, en la cuenta real, devuelve {"Results": {"Reg": [...]}}: puede haber más de un nivel.
+ENVOLTORIOS = ("Results", "results", "Reg", "reg", "Data", "data", "Datos", "datos", "Result", "result", "Resultado",
+               "resultado", "Items", "items", "Vehiculos", "vehiculos", "Value", "value", "Lista", "lista")
 # Un objeto con alguno de estos campos (y sin lista) es un aviso del proveedor, no datos.
 CAMPOS_AVISO = ("Message", "message", "Mensaje", "mensaje", "Error", "error", "ErrorMessage", "Errores")
 BASE_URL = "https://mapi.movildata.com"
@@ -94,6 +95,9 @@ def _consultar(ruta: str, params: dict | None = None):
                 raise MovildataError("Movildata no permite esta consulta. Revisa la clave y los servicios contratados.")
             if r.status_code == 429:
                 raise MovildataError("Movildata ha limitado las consultas. Vuelve a intentarlo en un minuto.")
+            if r.status_code == 400 and "no está asignada" in r.text:
+                # Vehículo sin matrícula asignada a su equipo en Movildata («Gestionar vehículos»): se arregla allí.
+                raise MovildataError("Este vehículo no tiene la matrícula asignada en Movildata: asígnala en «Gestionar vehículos».")
             if not 200 <= r.status_code < 300:
                 raise MovildataError("Movildata no ha podido responder a esta consulta.")
             datos = r.json()
@@ -118,17 +122,27 @@ def _lista(datos, *, objeto: bool = False) -> list[dict]:
     # GetLastConsumptions documenta un objeto; algunas cuentas devuelven una lista.
     if objeto and isinstance(datos, dict) and ("Imei" in datos or "Matricula" in datos):
         return [datos]
-    if isinstance(datos, dict):
-        # Lista dentro de un envoltorio («Data», «Result»…), o el único campo del objeto que es una lista.
+    bajado = False
+    for _ in range(3):   # hasta tres niveles de envoltorio («Results» → «Reg» → lista)
+        if not isinstance(datos, dict):
+            break
+        # Lista dentro de un envoltorio («Results», «Data»…), o el único campo del objeto que es una lista.
         listas = [datos[k] for k in ENVOLTORIOS if isinstance(datos.get(k), list)]
         if not listas:
             unicas = [v for v in datos.values() if isinstance(v, list)]
             listas = unicas if len(unicas) == 1 else []
         if listas:
             datos = listas[0]
-        elif any(k in datos for k in CAMPOS_AVISO):
+            break
+        interior = next((datos[k] for k in ENVOLTORIOS if isinstance(datos.get(k), dict)), None)
+        if interior is not None:
+            datos, bajado = interior, True
+            continue
+        if any(k in datos for k in CAMPOS_AVISO):
             log.warning("Movildata: aviso en lugar de datos (%s)", forma(datos))
             raise MovildataError("Movildata ha respondido con un aviso en lugar de datos. Revisa la clave y los servicios contratados.")
+    if bajado and isinstance(datos, dict) and not any(k in datos for k in CAMPOS_AVISO):
+        return [datos]   # un solo registro dentro del envoltorio (sin lista)
     if not isinstance(datos, list) or any(not isinstance(f, dict) for f in datos):
         log.warning("Movildata: no es una lista de registros (%s)", forma(datos))
         raise MovildataError("Movildata ha enviado una respuesta que no se puede leer.")
@@ -158,6 +172,15 @@ def _booleano(valor) -> bool | None:
 def _fecha(valor) -> str | None:
     if not isinstance(valor, str) or not valor.strip():
         return None
+    # La cuenta real manda «05/11/2026 10:53:47» (día/mes/año, hora peninsular); la documentación, ISO con offset.
+    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?", valor.strip())
+    if m:
+        dia, mes, anio, h, mi, s = m.groups()
+        try:
+            local = datetime(int(anio), int(mes), int(dia), int(h), int(mi), int(s or 0), tzinfo=MADRID)
+        except ValueError:
+            return None
+        return local.astimezone(timezone.utc).isoformat()
     try:
         d = datetime.fromisoformat(valor.strip().replace("Z", "+00:00"))
         # Los ejemplos del proveedor incluyen offset. Sin él se usa su zona española.

@@ -299,3 +299,36 @@ def test_aviso_del_proveedor_se_explica_sin_mostrarlo(monkeypatch):
 def test_forma_no_incluye_valores():
     f = movildata.forma([{"Matricula": "1234 ABC", "Imei": "secreto"}])
     assert "Matricula" in f and "1234" not in f and "secreto" not in f
+
+
+def test_posiciones_como_las_manda_la_cuenta_real(monkeypatch):
+    """Forma real de GetLastLocations: {"Results": {"Reg": [...]}} (y un solo registro sin lista)."""
+    datos = respuestas()
+    posiciones = datos["/Users/GetLastLocations"]
+    datos["/Users/GetLastLocations"] = {"Results": {"Reg": posiciones}}
+    conectar(monkeypatch, datos)
+    r = movildata.resumen_flota()
+    assert r["estado"] == "conectado" and r["vehiculos"][0]["latitud"] == 40.1
+    movildata._cache.clear()
+    datos["/Users/GetLastLocations"] = {"Results": {"Reg": posiciones[1]}}
+    conectar(monkeypatch, datos)
+    r = movildata.resumen_flota()
+    assert r["vehiculos"][1]["latitud"] == 40.2 and r["vehiculos"][0]["latitud"] is None
+
+
+def test_vehiculo_sin_matricula_asignada_en_movildata_se_explica(monkeypatch):
+    datos = respuestas()
+    datos["/Users/GetDataBetweenDates"] = httpx.Response(400, json={
+        "Message": "Existen errores de validación",
+        "Errors": ["dispositivo: La matrícula 0001 PRB no está asignada. Vaya a gestionar vehículos y asigne la matrícula"]})
+    conectar(monkeypatch, datos)
+    r = movildata.resumen_flota()
+    assert r["vehiculos"][0]["km_hoy"] is None
+    assert any("Gestionar vehículos" in a for a in r["vehiculos"][0]["avisos"])
+    assert r["vehiculos"][0]["latitud"] == 40.1   # el resto de sus datos se ve igual
+
+
+def test_fecha_en_formato_espanol_de_la_cuenta_real():
+    assert movildata._fecha("05/11/2026 10:53:47") == "2026-11-05T09:53:47+00:00"   # noviembre: hora peninsular = UTC+1
+    assert movildata._fecha("15/07/2026 10:00") == "2026-07-15T08:00:00+00:00"      # verano: UTC+2
+    assert movildata._fecha("31/02/2026 10:00:00") is None
