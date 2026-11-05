@@ -1,225 +1,42 @@
 # App de Grupo Trimodos
 
-App interna para móvil y ordenador. Una sola web (Next.js) con login común y módulos según el perfil de cada persona.
+App interna para móvil y ordenador: login común y, según el perfil, fichaje y vacaciones (piloto actual), DECA y el
+resto de funciones. **Odoo es la base de datos principal**; Supabase guarda el login, los perfiles y lo que no va a
+Odoo. Reglas del proyecto: [`AGENTS.md`](AGENTS.md). Cómo funciona cada parte: [`docs/`](docs/README.md).
 
-| Parte | Qué es | Dónde |
-|---|---|---|
-| App general | Login (Microsoft para oficina; código + PIN para conductores y operarios), inicio con botón de fichar, indicadores y los módulos de cada uno, y administración de usuarios, centros y roles | `src/` (Next.js) |
-| Base de datos y login | Supabase (PostgreSQL + Auth). Los permisos están en la base de datos (RLS) | `supabase/migrations/` |
-| **DECA** | El conductor corrige mercancía, bultos, euro palets y peso de la orden de transporte en Odoo y descarga el PDF | Pantallas: `public/deca/` · API: `servicios/` (Python) |
-| **ARGON** | Excel de Carburos → pedidos en Odoo. Lo llama n8n; no tiene pantallas | `servicios/argon/` |
-| **Fichaje** | Entrada, pausas y salida. Se guarda en Supabase (registro de jornada) y se envía a Odoo (Asistencias) | `src/app/fichaje/` · `servicios/rrhh.py` |
-| **Vacaciones y ausencias** | Pedir días; el responsable aprueba y se crea la solicitud en Odoo (Ausencias) | `src/app/ausencias/` · `servicios/rrhh.py` |
-| **Mi equipo** | Para responsables: quién ha fichado, ausencias por aprobar, correcciones de fichajes y camión de cada chófer | `src/app/equipo/` |
-| **Flota** | Centro de tráfico: mapa, última señal, movimiento, combustible, kilómetros, consumo diario y recorridos de los vehículos autorizados en Movildata | `src/app/flota/` · `servicios/flota.py`, `servicios/movildata.py` |
-| **Seguridad** | Caducidades (ITV, seguro y tacógrafo de cada camión; carnet, CAP, tarjeta y reconocimiento de cada persona), carretillas y traspaletas con sus revisiones, inspecciones de almacén e incidencias | `src/app/seguridad/`, `src/app/documentos/`, `src/app/incidencias/` · `src/lib/seguridad.ts` |
-| **Mi camión** | Chóferes: confirmar el camión, consultar sus datos de Movildata y empezar/terminar jornada (ficha a la vez). La detección por tarjeta solo se simula en pruebas | `src/app/chofer/` · `servicios/chofer.py`, `servicios/movildata.py` |
+| Parte | Dónde |
+|---|---|
+| Web (Next.js 16) | `src/` |
+| API Python (FastAPI): Odoo, Movildata, DECA y ARGON | `servicios/`, publicada con `api/index.py` |
+| Login, perfiles y permisos (Supabase, RLS) | `supabase/migrations/` |
+| PWA de DECA | `public/deca/` |
+| Pruebas y utilidades | `tests/`, `scripts/` |
 
-Todo se publica en **un solo proyecto de Vercel**: Next.js para las pantallas y una función Python (`api/index.py`) para DECA y ARGON.
+Todo se publica en **un solo proyecto de Vercel**: `https://app-two-omega-92.vercel.app`. Un `git push` a `main`
+despliega (preguntar antes). La configuración que se hace una sola vez (Supabase, Microsoft, Google, Vercel) está en
+[`docs/configuracion-inicial.md`](docs/configuracion-inicial.md).
 
-```
-src/app/            páginas: inicio, login, admin, fichaje, ausencias, equipo, chofer, flota; /api/sesion/token
-src/lib/            clientes de Supabase, módulos, PIN
-src/proxy.ts        renueva la sesión y manda al login a quien no la tenga
-public/deca/        PWA de DECA (HTML/JS sin framework, funciona sin cobertura)
-servicios/          API Python: DECA (main.py, service.py, odoo_client.py…), ARGON (argon/), fichaje y ausencias → Odoo
-                    (rrhh.py), Movildata (movildata.py, chofer.py, flota.py); supa.py lee/escribe en Supabase con el token del usuario
-api/index.py        entrada de la función Python en Vercel
-supabase/migrations SQL de tablas, permisos y altas
-tests/              pruebas de la API Python      scripts/  diagnóstico, permisos de Odoo, prueba en navegador
-```
+## Arrancar en local (Mac y Windows)
 
----
-
-## 1. Puesta en marcha (una sola vez)
-
-### 1.1 Supabase
-1. Proyecto **`app`** (región París, `eu-west-3`), URL `https://kcklgxmbojfpiwtsuibm.supabase.co`.
-2. Las migraciones de `supabase/migrations/` **ya están aplicadas** (tablas, permisos RLS y ajustes de seguridad; los avisos de seguridad de Supabase salen limpios). Cualquier cambio futuro: un archivo nuevo en esa carpeta, nunca editar uno aplicado.
-3. **Project Settings → API**: apunta la **URL**, la clave **publishable** (o *anon*) y la clave **secret** (o *service_role*). La secreta no se comparte nunca.
-4. **Authentication → URL Configuration**: en *Site URL* pon la dirección de la app (p. ej. `https://app.grupotrimodos.com`) y en *Redirect URLs* añade `https://app.grupotrimodos.com/auth/callback` y `http://localhost:3000/auth/callback`.
-
-### 1.2 Login con Microsoft (personal de oficina)
-1. Pide a IT que registre una aplicación en **Microsoft Entra ID** (*App registrations → New registration*):
-   - Tipo de cuenta: **solo este directorio** (la empresa).
-   - Redirect URI (Web): `https://<tu-proyecto>.supabase.co/auth/v1/callback`.
-   - Crear un **client secret** y apuntar *Application (client) ID*, el secreto y el *Directory (tenant) ID*.
-2. En Supabase → **Authentication → Providers → Azure**: actívalo, pega el client ID y el secreto, y en *Azure Tenant URL* pon `https://login.microsoftonline.com/<tenant-id>`. Así **solo entran cuentas de la empresa**.
-3. **Calendario de Outlook** (opcional; apagado hasta hacer esto): IT añade en la app de Entra los permisos delegados de Microsoft Graph `offline_access` y `Calendars.ReadWrite` y pulsa *Conceder consentimiento de administrador*. Después, en Vercel: `OUTLOOK_CALENDARIO=true`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` (el *Valor* del secreto), `AZURE_TENANT_ID`, y que estén `SECRET_KEY` y `SUPABASE_SECRET_KEY`. Cada persona tiene que salir y volver a entrar con Microsoft una vez. **No activar `OUTLOOK_CALENDARIO` antes del consentimiento**: a todos les saldría «Se necesita la aprobación del administrador» al entrar.
-
-### 1.3 Conductores y operarios con Google (opcional)
-1. **Google Cloud Console** → *APIs y servicios* → *Credenciales* → *Crear ID de cliente de OAuth* (aplicación web). URI de redirección autorizada: `https://<tu-proyecto>.supabase.co/auth/v1/callback`. Solo pide nombre y correo: Google no exige revisión.
-2. **Supabase → Authentication → Sign In / Providers → Google**: actívalo y pega el *Client ID* y el *Client Secret*.
-3. **Vercel:** `LOGIN_GOOGLE=true` (sin esto el botón no sale) y Redeploy.
-4. Quien entra con Google aparece **inactivo** en «Personas por configurar» hasta que le das puesto y centro.
-5. **Enlace con Odoo:** su Gmail en el **«Correo de trabajo»** de su ficha de empleado (si no tiene correo de empresa), o en un campo propio de la ficha (p. ej. «Correo de acceso a la app») indicando su nombre técnico en `ODOO_CAMPO_CORREO=x_...`.
-
-### 1.4 Conductores y operarios (código + PIN)
-No hace falta configurar nada: los da de alta un administrador desde **Administración** en la app. Por dentro, Supabase guarda un correo interno (`<código>@pin.grupotrimodos.com`) que nadie ve. Deja **activado** el proveedor *Email* (Authentication → Providers), porque el PIN funciona como contraseña.
-
-### 1.5 Primer administrador
-1. Entra en la app con tu cuenta de Microsoft (verás «pendiente de activar»: es normal).
-2. En Supabase → SQL Editor:
-   ```sql
-   update public.usuarios set activo = true, es_admin = true where email = 'tu-correo@grupotrimodos.com';
+1. Instalar **Node.js 22** y **Python 3.12 o superior**.
+2. En la carpeta del proyecto:
+   ```bash
+   npm install
+   python -m venv .venv
+   .venv/bin/python -m pip install -r requirements-dev.txt      # Windows: .\.venv\Scripts\python.exe
    ```
-3. Recarga la app: ya verás **Administración** (eres **superadministrador**: lo ves todo). A partir de aquí todo se gestiona desde la app.
+3. Copiar `.env.example` como **`.env.local`** y rellenarlo. Lo leen la web y la API Python; **nunca se sube a git**.
+   Lo que se deja vacío funciona en modo prueba (Odoo y Movildata simulados, `DRY_RUN=true`, `RRHH_DRY_RUN=true`).
+4. Arrancar (activa antes el entorno: `source .venv/bin/activate`, o `.\.venv\Scripts\activate` en Windows):
+   ```bash
+   npm run dev        # web en http://localhost:3000 + API Python en el puerto 8000
+   ```
+   Sin las variables de Supabase solo funciona DECA en modo simulado (`http://localhost:3000/deca/`).
 
-> **Toda cuenta nueva nace inactiva y sin perfiles.** Hasta que un administrador la activa no ve nada, ni en las pantallas ni en la API.
+## Comprobar antes de entregar
 
-### 1.6 Vercel
-1. *Add New Project* → importar `grupotrimodos/app`. Vercel detecta **Next.js** solo; la función Python de `api/index.py` se publica en el mismo proyecto.
-2. *Settings → Environment Variables*: todas las de `.env.example`, marcando como **Sensitive** las secretas (`SUPABASE_SECRET_KEY`, `ODOO_PASSWORD`, `ODOO_WEB_PASSWORD`, `SECRET_KEY`, `ARGON_CLAVE`, `ARGON_ODOO_PASSWORD`, `CRON_SECRET`, `MOVILDATA_API_KEY`, `AZURE_CLIENT_SECRET`). Los cambios de variables se aplican con un **Redeploy**.
-3. *Settings → Deployment Protection*: desactivar *Vercel Authentication* (la app ya tiene su propio login).
-4. *Settings → Domains*: añadir el subdominio (p. ej. `app.grupotrimodos.com`).
-5. **Uso con personal de la empresa = plan Pro** (el plan Hobby es solo para uso personal y no comercial).
-
-### 1.7 n8n (ARGON)
-ARGON mantiene su dirección: `POST https://<dominio>/api/argon/procesar` con la cabecera `X-Clave`. Solo hay que cambiar el dominio en n8n cuando se apague la app antigua.
-
----
-
-## 2. Trabajar en local (Windows y Mac)
-
-### Una sola vez
-- Instalar **Node.js 22** y **Python 3.12**. Windows: `winget install -e --id OpenJS.NodeJS.LTS` y `winget install -e --id Python.Python.3.12`. Mac: `brew install node python@3.12`.
-- En la carpeta del proyecto:
-  ```bash
-  npm install
-  python -m venv .venv
-  # Windows:  .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-  # Mac:      .venv/bin/python -m pip install -r requirements-dev.txt
-  ```
-- Copia `.env.example` como **`.env.local`** y rellénalo: lo leen la web y la API Python. **Nunca se sube a git.** Los tests no leen ningún archivo de entorno (`tests/conftest.py`), así que unas claves reales en `.env.local` nunca llegan a Odoo ni a Movildata desde una prueba.
-
-### Cada vez
 ```bash
-npm run dev        # web en http://localhost:3000 + API Python en el puerto 8000
-```
-`npm run dev` usa el `python` del sistema: activa antes el entorno (`.\.venv\Scripts\activate` en Windows, `source .venv/bin/activate` en Mac).
-
-**Sin Supabase** (variables vacías) solo funciona DECA en **modo simulado**: abre `http://localhost:3000/deca/` y entras como «Usuario de prueba». El resto de la app muestra «no está configurada». En producción, sin Supabase, la API de DECA se niega a funcionar.
-
-### Pruebas
-```bash
-.venv/bin/python -m pytest -q                              # API Python (DECA, ARGON, sesión)
+.venv/bin/python -m pytest -q                              # API Python (los tests no leen .env.local)
 npx tsc --noEmit && npx next build                         # web
-.venv/bin/python -X utf8 -m scripts.prueba_navegador       # navegador real + cámara simulada (arranca web y API solas)
-.venv/bin/python -X utf8 -m scripts.comprobar_permisos     # permisos del usuario técnico de Odoo, sin escribir
-.venv/bin/python -X utf8 -m scripts.diagnostico_movildata  # forma de las respuestas de Movildata (sin datos ni clave)
+.venv/bin/python -X utf8 -m scripts.prueba_navegador       # si se toca DECA (navegador real, arranca web y API)
 ```
-(En Windows, `.\.venv\Scripts\python.exe` en lugar de `.venv/bin/python`.)
-
----
-
-## 3. Cómo funciona el acceso
-
-1. **Microsoft** (oficina) o **código + PIN** (conductores y operarios) → sesión de Supabase en cookies.
-2. `src/proxy.ts` renueva la sesión en cada página y manda al login a quien no la tenga.
-3. **Perfiles configurables.** Un *perfil* es un puesto (Chófer, Operario de almacén, Jefe de tráfico, RR. HH.…) con una lista de **permisos**. El administrador crea y edita perfiles desde **Administración → Perfiles** marcando casillas, y asigna a cada persona uno o varios perfiles **por centro** (`perfiles`, `usuario_perfil`). Lo que ve y puede hacer una persona es la suma de sus perfiles.
-   - Los permisos sobre otras personas (ver equipo, aprobar ausencias, corregir fichajes) valen en los centros donde tiene ese perfil, o en **todos** si el perfil lo marca.
-   - `usuarios.es_admin` = **superadministrador**: todo, en todos los centros. Solo otro superadministrador (o el editor SQL de Supabase) puede nombrarlo o cambiar su ficha.
-   - El permiso «Gestionar usuarios, perfiles y centros» puede darse cualquier otro permiso: solo para administración.
-4. **Catálogo único de permisos:** `src/lib/permisos.json` (áreas y permisos). De ahí salen las tarjetas del inicio (se ve un área si se tiene algún permiso de ella) y las casillas del editor de perfiles. Los mismos identificadores los exigen la base de datos (`privado.tengo_permiso`, `privado.puedo_sobre`) y la API Python (`requiere_permiso`).
-5. **RLS**: aunque alguien manipule la web, la base de datos solo deja hacer lo que permiten sus perfiles.
-6. **DECA**: sus pantallas piden el token a `/api/sesion/token` y lo mandan a la API Python (`Authorization: Bearer`). La API lo valida con Supabase y exige usuario **activo** con el permiso **`deca.usar`**. El **nombre del conductor queda en la nota** de la tarea de Odoo.
-
-## 3 bis. Perfiles y pantallas (más de 100 personas)
-
-- **Cuatro perfiles básicos, que no se borran ni cambian de nombre** (`perfiles.base`, lo impide la base de datos): **Administrador**, **Oficina**, **Chófer** y **Operario**. Cada persona tiene **un puesto en su centro**. Encima se le suman **complementos**: **Responsable**, que aprueba lo de su centro, y **Seguridad**, que vale en todos los centros. Los permisos de cada perfil se siguen editando con casillas.
-- **Cada perfil tiene su pantalla** (`perfiles.pantalla`). Si alguien tiene varias, manda la de más alcance. El superadministrador sin perfiles entra en Dirección.
-  - **Dirección** (`direccion`): el inicio es el cuadro de mando. No hay fichaje ni flota.
-  - **Oficina** (`oficina`): espacio de gestión con menú lateral: su jornada, la flota, DECA y lo que tenga que resolver.
-  - **Campo** (`campo`, chóferes y operarios): **una sola pantalla en el móvil, sin menú** (`src/app/InicioCampo.tsx`). Arriba, fichar con un botón grande y su camión. Debajo, sus avisos y su ropa de temporada. Al final, solo los accesos que da su perfil. En las demás pantallas, un botón «Inicio» para volver.
-- **Menú** (`src/lib/usuario.ts`, `enMenu`): en `permisos.json` los permisos del trabajo propio llevan `"de_puesto": true` (fichar, su camión, la flota, DECA, ausencias, documentación, incidencias, pedir ropa). Esos solo ponen su área en el menú si vienen de los perfiles de la persona. Los de gestión salen siempre, también al superadministrador. Así Dirección no ve fichaje ni flota, aunque pueda abrirlos.
-- **Operarios:** de serie solo fichan y reciben su ropa (`fichaje.fichar`, `ropa.pedir`). Se amplía en Administración → Perfiles.
-- **Administración a escala** (`/admin`), con pestañas:
-  - **Personas:** búsqueda, filtros por centro, perfil y estado y páginas de 50. Quien entra por primera vez con Google o Microsoft aparece en «Por configurar» y se activa **en bloque**: se marcan, se elige puesto y centro, y listo. «Cambiar puesto» sustituye el puesto y conserva los complementos.
-  - **Perfiles**, **Centros** (con su analítica de Odoo) y **Camiones**.
-  - Cada acción vuelve a la misma pestaña con sus filtros.
-- **Ropa por temporada** (`/ropa`; tablas `ropa_kits`, `tallas_ropa`, `ropa_dotaciones`):
-  - **Temporadas y dotación:** el verano va del 1 de abril al 30 de septiembre y el invierno del 1 de octubre al 31 de marzo. Cada puesto tiene la composición de **una muda** por temporada y cuántas mudas tocan (2). La dotación de cada persona se prepara sola (`public.preparar_dotaciones()`), así que nadie la tiene que pedir. Las dotaciones aún sin entregar siguen a quién le toca ahora: si alguien se da de baja o cambia a un puesto sin ropa, la suya desaparece de la lista.
-  - **Tallas:** cada uno apunta cuatro tallas: parte de arriba, pantalón, calzado y guantes. Puede hacerlo también su responsable.
-  - **Entrega y confirmación:** el responsable ve **qué preparar**, con unidades por prenda y talla para el pedido al proveedor, y marca cada dotación como entregada. La persona confirma que la ha recibido. Nadie se entrega lo suyo.
-  - **Cambios:** las solicitudes sueltas quedan para roturas, tallas o pérdidas.
-  - **Permisos:** `ropa.pedir`, `ropa.gestionar` y `ropa.configurar` (para la composición).
-- **Chóferes por cliente o ruta** (`/equipo/zonas`; tablas `zonas` y `chofer_zona`; permiso `zonas.gestionar`): cada chófer de sus centros tiene una zona, que es un cliente o una ruta. Se asignan todos de una vez. El cuadro de mando separa a los chóferes por zona: cuántos hay, cuántos han fichado y trabajan, cuántos tienen camión y su documentación.
-- **Analítica de cada centro** (Administración → Centros; tabla `centro_analitica`): qué cuentas o etiquetas analíticas de Odoo son de cada centro. Con ellas el cuadro de mando separa ingresos, gastos y margen por centro. Una cuenta o etiqueta solo puede ser de un centro.
-
-## 4. Fichaje, ausencias y chóferes
-
-- **Supabase es el registro de jornada.** Los fichajes no se borran ni se editan: si alguien se equivoca, su responsable añade una **corrección** con su motivo (queda quién y cuándo). Uno mismo solo puede fichar «ahora» (la base de datos rechaza horas pasadas o futuras).
-- **Envío a Odoo:** tras cada fichaje la web llama a la API Python, que manda lo pendiente a `hr.attendance` (entrada/vuelta de pausa abren; pausa/salida cierran). Cada fichaje muestra si está en Odoo, pendiente o con error, y hay botón de reintentar. **`RRHH_DRY_RUN`** (por defecto `true`, independiente del `DRY_RUN` de DECA) marca «modo prueba» y no escribe nada en Odoo. Un registro ya enviado no se puede volver a enviar (lo impide la base de datos).
-- Si Odoo rechaza un fichaje (p. ej. una entrada de otro día sin cerrar), queda en error y los siguientes de esa persona esperan hasta arreglarlo en Odoo y reintentar; las correcciones con hora pasada que Odoo rechace se arreglan a mano allí y no frenan al resto.
-- **Ficha de empleado automática:** para llegar a Odoo hace falta el id de empleado. Se busca solo: por **correo de trabajo** (quien entra con Microsoft) o por el **código** en el campo «Credencial» (`barcode`) de la ficha (quien entra con código + PIN). Si hay varias o ninguna, la pantalla de Sincronización lo dice y se pone a mano en Administración.
-- **Ausencias:** al aprobarlas se crea la solicitud en `hr.leave`. El tipo de Odoo se elige **solo por su nombre** (vacaciones, enfermedad/médico, asuntos propios, no retribuido…). Para forzarlo: `ODOO_TIPOS_AUSENCIA` (JSON, p. ej. `{"vacaciones": 1}`). En Odoo queda para validar según su flujo.
-- **Inicio** (`src/app/page.tsx`): «Mi jornada» con el botón de fichar (el mismo que «Fichaje»: guarda en Supabase y envía a Odoo al momento), horas de hoy y de la semana y si el último fichaje está en Odoo. Debajo, **indicadores según los permisos**, nunca según el perfil: mi camión (`chofer.usar`), flota en movimiento y que requiere atención (`flota.ver`, se carga aparte para no frenar la página), trabajando ahora (`equipo.ver`), ausencias por aprobar (`ausencias.aprobar`), usuarios sin activar (`admin.usuarios`), envíos a Odoo con error (`admin.sincronizacion`) y mis solicitudes y próxima ausencia (`ausencias.pedir`).
-- **Mi equipo:** con los permisos «Ver a las personas de sus centros», «Aprobar ausencias» y «Corregir fichajes» (perfil «Responsable» de serie). Nadie aprueba ni corrige lo suyo.
-- **Movildata real:** configura `MOVILDATA_API_KEY` en Vercel como variable sensible y `MOVILDATA_MODE=real` (si se omite el modo, una clave configurada activa el modo real). Después hay que desplegar esta versión. Una variable antigua `MOVILDATA_MODE=mock` mantiene explícitamente el modo de prueba.
-- **Centro de flota:** `/flota`, protegido por el permiso global **`flota.ver`**, consulta los vehículos que autoriza la cuenta Movildata: no hay matrículas ni un número de vehículos fijados en código. El administrador marca «Ver posición y actividad de toda la flota de Movildata» en los perfiles de tráfico que deban consultarla. Este permiso abarca la cuenta completa, independientemente del centro; no se asigna automáticamente a perfiles existentes.
-- **Formato real de la cuenta** (comprobado con `scripts.diagnostico_movildata`): las posiciones llegan dentro de `{"Results": {"Reg": [...]}}` y las fechas como `05/11/2026 10:53:47` (hora peninsular); la app entiende las dos cosas además del formato documentado. Si un vehículo no tiene la matrícula asignada a su equipo en Movildata, sus kilómetros y recorrido fallan y la app lo dice en ese vehículo: se arregla en Movildata, «Gestionar vehículos».
-- La integración usa solo lecturas documentadas en [la API oficial de Movildata](https://mapi.movildata.com/Help): `GetVehiculos`, `GetLastLocations`, `GetLastConsumptions`, `GetDataBetweenDates` y `GetGPSData`. Los servicios no contratados, sensores sin lectura y errores se muestran como datos no disponibles; nunca se sustituyen por cifras de prueba. Las consultas se reutilizan 60 segundos para limitar llamadas. Una señal de más de 15 minutos se distingue de una posición reciente.
-- El resumen del día y los recorridos usan **Europe/Madrid**. Se puede consultar un recorrido de los últimos 31 días, dentro de la disponibilidad de Movildata. Si supera 1.000 puntos, se simplifica para visualizarlo y se indica. La clave nunca llega al navegador; las rutas `/api/flota/*` exigen sesión real y permiso, incluso cuando DECA está en pruebas.
-- **Mi camión:** el conductor confirma su camión y recibe únicamente la telemetría de su asignación abierta, comprobada con su sesión en Supabase. En modo real no se identifica al conductor por la matrícula ni se calculan tiempos legales de conducción a partir del GPS. En modo `mock` la demostración de tarjeta y jornada se identifica expresamente como simulada.
-- La web llama a la API Python por el **dominio de producción** (`VERCEL_PROJECT_PRODUCTION_URL`; en las vistas previas, `VERCEL_URL`), o por `APP_URL` si se define. La dirección propia de cada despliegue la tapa el login de Vercel (*Standard Protection*): si se usara, la flota y el envío a Odoo no llegarían.
-
-## 4 bis. Seguridad y calendario
-
-- **Permisos:** `seguridad.ver` (panel de todos los centros), `seguridad.gestionar` (documentación de todos, carretillas, inspecciones y seguimiento de incidencias), `documentos.propios` («Mi documentación») e `incidencias.reportar`. Quien tiene `vehiculos.gestionar` (Oficina) ve y lleva solo la documentación de los camiones (`/seguridad?ver=vehiculos`).
-- **Qué documentación pide cada puesto** se marca en **Administración → Perfiles** (`perfiles.documentos`). A cada persona se le pide en «Mi documentación» y se le avisa en su inicio de lo que falta o caduca en 30 días. Catálogo de tipos: `src/lib/seguridad.ts`.
-- Las **revisiones** de carretillas y las **inspecciones** son un registro: no se cambian ni se borran. Una revisión «fuera de servicio» deja el equipo fuera de servicio.
-- **Incidencias:** quien reporta ve las suyas; seguridad las ve todas y es la única que las cambia. Para cerrarlas hay que apuntar las medidas tomadas.
-- **Cuadro de mando de dirección** (`src/app/CuadroDeMando.tsx`, permiso `direccion.ver`; la parte de dinero exige además `direccion.finanzas`). Es el inicio de la pantalla de Dirección y está también en `/direccion` para quien lo tiene desde otra pantalla. No incluye fichaje ni flota. Tiene cinco pestañas:
-  - **Resumen:** alertas de cobros vencidos, pagos vencidos o que vencen en 7 días, pedidos sin facturar de más de 30 días, caducidades, incidencias graves, personas sin perfil y chóferes sin zona. Cifras de negocio con comparativas y personas de hoy.
-  - **Finanzas:** gráficas de 12 meses frente al año anterior, con leyenda y tabla. Cobros y pagos por antigüedad y con los principales clientes y proveedores, y pendiente de facturar.
-  - **Centros y zonas:** personas, ingresos, gastos y margen de cada centro, y chóferes por cliente o ruta.
-  - **Comercial:** embudo del CRM, ganado y nuevas frente al mes anterior.
-  - **Personas:** presencia de los últimos 14 días, por resolver, plantilla por perfil, ropa de la temporada y seguridad.
-  - El filtro de empresa vale para todo el grupo, STINSA o TRANSARGI. Las personas salen de `public.resumen_direccion()`, que solo devuelve totales y comprueba el permiso, y el dinero de la API Python. Una cifra solo enlaza a una pantalla si quien mira puede abrirla.
-- **Finanzas de dirección en Odoo** (`servicios/direccion.py`, todo GET, solo lectura y solo totales):
-  - `/api/odoo/finanzas` (permiso `direccion.finanzas`): facturación y ventas de los últimos 24 meses con sus comparativas (mes en curso frente al mismo día del mes anterior y del año pasado, año en curso frente al año pasado hasta el mismo día), cobros y pagos pendientes (vencido, lo que vence en 7 y 30 días, antigüedad en 5 tramos y los 8 clientes o proveedores con más pendiente) y pedidos confirmados sin facturar (y los de más de 30 días).
-  - `/api/odoo/centros` (`direccion.finanzas`): ingresos, gastos y margen de cada centro activo según sus **cuentas o etiquetas analíticas**. Qué analítica es de cada centro se guarda en Supabase (`centro_analitica`) y se lee con el token de quien mira. Un centro sin analítica sale como «sin configurar».
-  - `/api/odoo/analitica` (`admin.usuarios`): catálogo de cuentas y etiquetas analíticas para asignarlas a los centros.
-  - `/api/odoo/comercial` (`direccion.ver`) añade las oportunidades ganadas y nuevas del mes anterior hasta el mismo día.
-  - Todas aceptan `?empresa=<id>` (uno de `ODOO_COMPANY_IDS`; otro da error 400). Cada parte se calcula por separado: si falla o falta su aplicación, llega vacía con su aviso. Caché de 10 minutos (5 el comercial; 1 si algo falló). «Hoy» es el día de Madrid.
-  - **Permisos de lectura** del usuario técnico de Odoo (en las dos empresas): facturas y apuntes (`account.move`, `account.move.line`), pedidos y sus líneas (`sale.order`, `sale.order.line`, de **todos** los comerciales, no «solo sus documentos»), cuentas y etiquetas analíticas (`account.analytic.account`, `account.analytic.tag`) y empresas (`res.company`). `scripts.comprobar_permisos` ya los comprueba. Odoo 15: las etiquetas analíticas desaparecen en Odoo 16 (allí habría que leer `analytic_distribution`).
-- **A cada uno le llega lo suyo** (`src/lib/pendientes.ts`): un único cálculo, según permisos y RLS, de lo que cada persona tiene que resolver (vacaciones y ropa por aprobar o entregar, personas por configurar, caducidades, incidencias abiertas, envíos a Odoo con error, su documentación) y de las respuestas a lo que pidió en los últimos 7 días. Lo usan la **campana** de la cabecera, la página **`/pendientes`** y las cifras del inicio, que así siempre coinciden. Las caducidades salen de `public.resumen_caducidades()`, con el mismo criterio que el panel de Seguridad.
-- **Normas:** cada persona tiene un puesto **en su centro** (al dar de alta, perfil y centro son obligatorios; solo los perfiles «todos los centros» van sin centro). **Responsable** resuelve lo de su centro; sin responsable, la administración. Nadie aprueba lo suyo. Cada uno ve en «Vacaciones» y «Ropa» quién le aprueba (`public.quien_me_aprueba()`). En **Administración**, «Personas por configurar» lista a quien no tiene perfil y lo deja listo en un paso. «Mi equipo» muestra todas las solicitudes por aprobar de cualquier centro y, al superadministrador, también a quien no tiene centro.
-- El alta con código + PIN es todo o nada: si falla un paso se deshace la cuenta. La protección del superadministrador deja pasar primero al servidor (antes, toda escritura del servidor en `usuarios` fallaba con «permission denied for schema privado»).
-- **Ropa de trabajo** (`/ropa`, catálogo en `src/lib/ropa.ts`): la dotación de cada temporada llega sola (apartado 3 bis). Además, chóferes y operarios piden **cambios** por rotura, talla o pérdida, y el responsable de su centro (`ropa.gestionar`) los aprueba o rechaza y los marca como entregados. Nadie resuelve lo suyo y las solicitudes no se borran.
-- **Centros reales:** oficinas de Grao de Castellón, Castellón de la Plana, Burriana y Sevilla; centros de montaje de Castellón, Burriana y Sevilla. Complementos que se suman al puesto: **Responsable** (su centro) y **Seguridad** (todos).
-- **Calendario de Outlook** (`src/lib/outlook.ts`): agenda de hoy en el inicio y ausencias aprobadas apuntadas en el Outlook de esa persona («fuera de la oficina»). El token de Microsoft se guarda **cifrado** (`microsoft_tokens`, sin acceso para ningún usuario, solo la clave de servidor). Activación: apartado 1.2.
-
-## 5. Sincronización automática con Odoo
-
-Nadie tiene que decidir dónde va cada dato: `servicios/sincronizacion.py` tiene un **mapa** por tipo de dato con la aplicación de Odoo que lo guarda y quién manda.
-
-| Dato | Sentido | Aplicación de Odoo |
-|---|---|---|
-| Fichas de empleado | Odoo → app (enlace automático) | Empleados (`hr`) |
-| Fichajes | app → Odoo | Asistencias (`hr_attendance`) |
-| Vacaciones y ausencias aprobadas | app → Odoo | Ausencias (`hr_holidays`) |
-| Camiones | Odoo → app | Flota (`fleet`) |
-
-- Antes de enviar mira qué aplicaciones están **instaladas** en Odoo; si falta una, ese dato se salta y se explica (nunca se fuerza otro sitio).
-- Se envía **al momento** con cada acción; además hay una **pasada automática** diaria (cron de Vercel a las 4:00 UTC, necesita `CRON_SECRET`) y el botón **Sincronizar ahora** en **Administración → Sincronización** (permiso «Ver y lanzar la sincronización»). Para más pasadas al día: un flujo de n8n que llame a `GET /api/odoo/procesar` con `Authorization: Bearer <CRON_SECRET>`.
-- El **estado de envío** (enviado, error…) solo lo escribe el servidor con la **clave de servidor** (`SUPABASE_SECRET_KEY`), después de comprobar con el token del usuario que puede ver ese registro. Sin esa variable en Vercel, todo se guarda pero nada llega a Odoo. Cada pasada queda en `odoo_sincronizacion`.
-- Con `RRHH_DRY_RUN=true` o con Odoo simulado (`ODOO_MODE=mock`) los registros quedan como **«simulado»** y no se guarda nada leído de Odoo (ni fichas ni camiones de prueba). Si al pasar a real se quiere enviar lo fichado en pruebas, en el editor SQL de Supabase: `update fichajes set odoo_estado = 'pendiente' where odoo_estado = 'simulado' and momento >= '<fecha>';` (desde la app no se puede).
-- **Añadir un dato nuevo** (p. ej. documentación de vehículos): una entrada en `MAPAS` y su función en `PASOS`, sus lecturas/escrituras en la lista blanca de `odoo_client.py` y sus tests.
-
-## 6. DECA: reglas y lecciones (no redescubrir)
-- **Lista blanca en el cliente de Odoo** (`servicios/odoo_client.py`): solo se escriben `goods_id`, `number_of_packages`, `euro_pallet_qty` y `shipping_weight` de `tms.package`; nota solo en `project.task`; imprimir solo la orden de transporte. Hay tests que lo garantizan.
-- **`DRY_RUN=true`** hace todo menos escribir/publicar/imprimir. Producción v15 solo con el pedido de prueba S2621473 y con permiso expreso.
-- Editable solo en etapa «Nuevo» o «En desarrollo» (`EDITABLE_STAGES`); aviso de peso por MMA a partir de `PESO_AVISO_KG` (27.000).
-- **Imprimir exige sesión web**: una clave API no sirve; hace falta `ODOO_WEB_PASSWORD` y el usuario técnico **sin 2FA**. El informe lee vehículos: el usuario técnico necesita *Fleet / Administrator* (o que Tecnativa lo lea con `sudo`).
-- Odoo 18: `message_post` necesita `body_is_html=True` (la app lo envía solo en ≥ 18).
-- Al cambiar archivos de `public/deca/`, **sube la versión de caché** en `public/deca/sw.js`.
-- La guía de conductores se edita en `GUIA_CONDUCTORES.md` y se genera con `python -X utf8 -m scripts.generar_guia` (un test falla si se queda desfasada).
-
-## 7. Añadir una función nueva
-1. Añade su **área y sus permisos** a `src/lib/permisos.json` (p. ej. `almacen.inventario`). Aparecen solos en el inicio y en el editor de perfiles.
-2. Pantallas en `src/app/<area>/`, protegidas con `conPermiso("<permiso>")` (o, como DECA, en `public/<area>/` si es una PWA aparte).
-3. Tablas nuevas con una **migración nueva**, RLS y políticas con `privado.tengo_permiso('<permiso>')` o `privado.puedo_sobre('<permiso>', usuario_id)`.
-4. Si tiene API Python: rutas `/api/<area>/...` en `servicios/`, protegidas con `requiere_permiso("<permiso>")`, su *rewrite* en `next.config.ts` y su exclusión en `src/proxy.ts`.
-5. Si algo debe llegar a Odoo: un mapa en `servicios/sincronizacion.py`.
-6. El administrador marca el permiso en los perfiles que correspondan desde **Administración → Perfiles**.
