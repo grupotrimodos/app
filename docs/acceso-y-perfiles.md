@@ -20,7 +20,16 @@
   - **Oficina** (`oficina`): espacio de gestión con menú lateral: su jornada, la flota, DECA y lo que tenga que resolver.
   - **Campo** (`campo`, chóferes y operarios): **una sola pantalla en el móvil, sin menú** (`src/app/InicioCampo.tsx`). Arriba, fichar con un botón grande y su camión. Debajo, sus avisos y su ropa de temporada. Al final, solo los accesos que da su perfil. En las demás pantallas, un botón «Inicio» para volver.
 - **Menú** (`src/lib/usuario.ts`, `enMenu`): en `permisos.json` los permisos del trabajo propio llevan `"de_puesto": true` (fichar, su camión, la flota, DECA, ausencias, documentación, incidencias, pedir ropa). Esos solo ponen su área en el menú si vienen de los perfiles de la persona. Los de gestión salen siempre, también al superadministrador. Así Dirección no ve fichaje ni flota, aunque pueda abrirlos.
-- **Operarios:** de serie solo fichan y reciben su ropa (`fichaje.fichar`, `ropa.pedir`). Se amplía en Administración → Perfiles.
+- **Permisos en el piloto de fichaje y vacaciones** (migración `20261105000400_perfiles_piloto.sql`; lo demás está oculto, no borrado):
+  - **Administrador:** cuadro de mando (`direccion.ver`, sin finanzas), Mi equipo (ver, aprobar vacaciones, corregir fichajes) y administración (personas y sincronización con Odoo).
+  - **Oficina:** fichar, pedir vacaciones y DECA.
+  - **Chófer:** fichar, pedir vacaciones y DECA.
+  - **Operario:** fichar y pedir vacaciones.
+  - **Responsable** (complemento): ver a su equipo, aprobar vacaciones y corregir fichajes de su centro.
+  - **Seguridad** (complemento): sin permisos durante el piloto.
+  - El superadministrador sigue teniéndolo todo.
+  - Al guardar el perfil Chófer en Administración vuelve «Mi documentación» (`documentos.propios`), porque el puesto pide documentos. Para que no vuelva, hay que desmarcar también esos documentos.
+  - El cuadro de mando cuenta como chóferes a quien tiene «Mi camión» (`chofer.usar`), así que durante el piloto esa cifra sale a 0.
 - **Administración a escala** (`/admin`), con pestañas:
   - **Personas:** búsqueda, filtros por centro, perfil y estado y páginas de 50. Quien entra por primera vez con Google o Microsoft aparece en «Por configurar» y se activa **en bloque**: se marcan, se elige puesto y centro, y listo. «Cambiar puesto» sustituye el puesto y conserva los complementos.
   - **Perfiles**, **Centros** (con su analítica de Odoo) y **Camiones**.
