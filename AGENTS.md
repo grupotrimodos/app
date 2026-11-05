@@ -25,7 +25,8 @@ cambiar una función.
      Es la segunda y última lista autorizada.
    - Borrar (`unlink`): nunca.
    - Nunca ampliar las escrituras sin permiso expreso de Félix; cualquier escritura nueva se propone antes, explicando
-     qué toca.
+     qué toca. `tests/test_odoo_escrituras.py` falla si una de las dos listas crece, si aparece un borrado o si otro
+     archivo habla con Odoo por su cuenta: no se arregla la prueba, se pide permiso.
    - Leer todo no es enseñar todo: cada pantalla y cada ruta filtra por los permisos de quien mira (nóminas, salarios y
      contabilidad nunca a quien no corresponda).
 5. **Perfiles:** se configuran desde la app con los permisos de `src/lib/permisos.json`. Nunca hacer una página por
