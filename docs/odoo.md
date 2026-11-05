@@ -2,6 +2,42 @@
 
 Odoo es la base de datos principal. Qué se puede leer y escribir: `AGENTS.md`, base 4. Todo pasa por `servicios/odoo_client.py` (lista blanca `ALLOWED_CALLS`); ARGON tiene su propia lista congelada.
 
+## Leer y escribir en Odoo
+
+**Leer:** cualquier modelo, solo con los métodos de lectura (`METODOS_LECTURA` en `servicios/odoo_client.py`). Lo leído
+solo llega a una pantalla por una ruta concreta de la API con su permiso. No existe ninguna ruta que lea «el modelo que le
+pidan», y `tests/test_odoo_escrituras.py` falla si aparece. Nóminas, salarios, contratos y contabilidad solo se enseñan
+con el permiso que les corresponda (hoy, la contabilidad resumida con `direccion.finanzas`).
+
+**Escribir:** solo la lista cerrada `ESCRITURAS`. Cada entrada dice qué toca y la única función que la usa:
+
+| Qué | Modelo y método | Lo provoca | Interruptor |
+|---|---|---|---|
+| Abrir la asistencia de un empleado | `hr.attendance` · `create` | Fichar entrada o volver de la pausa | `RRHH_DRY_RUN` |
+| Cerrar su asistencia abierta (solo la hora de salida) | `hr.attendance` · `write` | Fichar pausa o salida | `RRHH_DRY_RUN` |
+| Crear la solicitud de una ausencia | `hr.leave` · `create` | Su responsable la aprueba en la app; en Odoo queda por validar | `RRHH_DRY_RUN` |
+| Mercancía, bultos, euro palets y peso de un bulto | `tms.package` · `write` (solo esos 4 campos) | El chófer corrige su orden en DECA | `DRY_RUN` |
+| Nota en la tarea de la orden | `project.task` · `message_post` | DECA, al guardar | `DRY_RUN` |
+
+ARGON tiene su propia lista, congelada (`docs/argon.md`). Borrar (`unlink`), nunca.
+
+**Cómo se escribe (procedimiento fijo):**
+1. **Primero se guarda en Supabase.** El registro (fichaje, ausencia) hace de cola: `odoo_estado` es pendiente, enviado,
+   error, sin empleado o simulado. Se guarda también el id de Odoo y el motivo del error. DECA es la excepción: escribe
+   al momento en la orden y deja su nota.
+2. **Sale por su mapa** de `servicios/sincronizacion.py`, nunca por envíos sueltos. Se intenta al momento y la pasada
+   automática diaria (o el botón «Sincronizar ahora») reintenta lo pendiente.
+3. **Una sola vez:** lo enviado no se vuelve a enviar (lo impide la base de datos).
+4. **Solo se crea o se completa lo propio:** una asistencia o una solicitud nuevas, cerrar la asistencia abierta de esa
+   persona y los 4 campos de DECA. Nunca se corrige desde la app lo que alguien ha cambiado en Odoo: si algo está mal,
+   se arregla en Odoo y se reintenta.
+5. **Con interruptor:** con `RRHH_DRY_RUN=true` (fichajes y ausencias) o `DRY_RUN=true` (DECA) no sale nada; el registro
+   queda como «simulado» y no se reenvía al apagarlo. En producción: `RRHH_DRY_RUN=false` (autorizado por Félix el
+   5-11-2026) y `DRY_RUN=true`.
+6. **A la vista:** cada registro enseña si está en Odoo, y los errores salen en Administración → Sincronización.
+7. **Escritura nueva:** se propone a Félix con el modelo, los campos, quién la provoca, cuándo, cómo se ve si falla y cómo
+   se deshace en Odoo. Solo con su permiso expreso se añade a `ESCRITURAS`, a su mapa y a la prueba.
+
 ## Sincronización automática
 
 Nadie tiene que decidir dónde va cada dato: `servicios/sincronizacion.py` tiene un **mapa** por tipo de dato con la aplicación de Odoo que lo guarda y quién manda.

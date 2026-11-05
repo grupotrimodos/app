@@ -1,7 +1,7 @@
-"""Cliente Odoo con lista blanca. NO existe ninguna llamada genérica: cada operación permitida es un método fijo.
+"""Cliente Odoo: lee cualquier modelo (solo métodos de lectura) y escribe SOLO lo de la lista cerrada ESCRITURAS.
 
-Lectura de tareas/bultos/mercancías/adjuntos; escritura SOLO de 4 campos en tms.package; message_post SOLO en project.task;
-impresión SOLO del informe tms_reporting.tms_transportation_order.
+Escritura: 4 campos de tms.package y nota en project.task (DECA), abrir y cerrar asistencias y crear ausencias (RRHH).
+Impresión SOLO del informe tms_reporting.tms_transportation_order. Borrar, nunca.
 """
 import json
 import logging
@@ -43,40 +43,27 @@ ATTACHMENT_FIELDS = ["res_model", "res_id", "access_token", "name"]
 EDITABLE_FIELDS = frozenset({"goods_id", "number_of_packages", "euro_pallet_qty", "shipping_weight"})
 REPORT_NAME = "tms_reporting.tms_transportation_order"
 
-# (modelo, método) permitidos. Todo lo demás se rechaza antes de salir hacia Odoo.
-ALLOWED_CALLS = {
-    (ORDER_MODEL, "search_read"),
-    (TASK_MODEL, "read"),
-    (TASK_MODEL, "search_read"),
-    (TASK_MODEL, "fields_get"),
-    (PACKAGE_MODEL, "read"),
-    (PACKAGE_MODEL, "fields_get"),
-    (GOODS_MODEL, "name_search"),
-    (GOODS_MODEL, "read"),
-    (ATTACHMENT_MODEL, "read"),
-    ("res.company", "search_read"),
-    ("ir.actions.report", "search_read"),   # solo vía find_report (diagnóstico)
-    (PACKAGE_MODEL, "write"),        # solo vía write_package (campos EDITABLE_FIELDS)
-    (TASK_MODEL, "message_post"),    # solo vía post_note
-    (ATTENDANCE_MODEL, "search_read"),  # solo vía asistencia_abierta
-    (ATTENDANCE_MODEL, "create"),       # solo vía abrir_asistencia (employee_id, check_in)
-    (ATTENDANCE_MODEL, "write"),        # solo vía cerrar_asistencia (check_out)
-    (LEAVE_MODEL, "create"),            # solo vía crear_ausencia
-    # Lecturas de la sincronización automática (solo lectura)
-    (LEAVE_TYPE_MODEL, "search_read"),  # solo vía tipos_ausencia
-    (EMPLOYEE_MODEL, "search_read"),    # solo vía buscar_empleado
-    (FLEET_MODEL, "search_read"),       # solo vía vehiculos_flota
-    (MODULE_MODEL, "search_read"),      # solo vía modulos_instalados
-    # Cuadro de mando de dirección: SOLO totales agrupados (read_group), nunca registros sueltos ni escrituras
-    (CRM_MODEL, "read_group"),          # solo vía crm_*
-    (ORDER_MODEL, "read_group"),        # solo vía ventas, ventas_por_mes y sin_facturar (nº de pedidos)
-    (INVOICE_MODEL, "read_group"),      # solo vía facturado, por_cobrar, facturacion_por_mes, pendiente_por_vencimiento y principales_pendiente
-    (ORDER_LINE_MODEL, "read_group"),   # solo vía sin_facturar (importe)
-    (MOVE_LINE_MODEL, "read_group"),    # solo vía analitica_por_mes
-    # Catálogo analítico para que la administración asigne cuentas/etiquetas a cada centro (solo id, nombre, código, empresa)
-    (ANALYTIC_ACCOUNT_MODEL, "search_read"),   # solo vía cuentas_analiticas
-    (ANALYTIC_TAG_MODEL, "search_read"),       # solo vía etiquetas_analiticas
+# ---- Qué se puede hacer en Odoo (AGENTS.md, base 4) ---------------------------------------------------------------
+# LEER: cualquier modelo, pero solo con estos métodos. Leer no es enseñar: lo leído solo sale por rutas concretas de la
+# API, cada una con su permiso; nunca hay una ruta que lea «el modelo que le pidan» (tests/test_odoo_escrituras.py).
+METODOS_LECTURA = frozenset({"search_read", "read", "read_group", "search", "search_count", "name_search", "fields_get",
+                             "check_access_rights"})
+
+# ESCRIBIR: SOLO esta lista cerrada, cada entrada con lo que toca y la única función que la usa. Borrar (unlink), nunca.
+# Ampliarla exige permiso expreso de Félix (procedimiento en docs/odoo.md); la prueba de escrituras falla si crece.
+ESCRITURAS = {
+    (PACKAGE_MODEL, "write"): "DECA: mercancía, bultos, euro palets y peso de un bulto (solo EDITABLE_FIELDS), vía write_package",
+    (TASK_MODEL, "message_post"): "DECA: nota en la tarea de la orden de transporte, vía post_note",
+    (ATTENDANCE_MODEL, "create"): "Fichaje: abrir la asistencia de un empleado (employee_id, check_in), vía abrir_asistencia",
+    (ATTENDANCE_MODEL, "write"): "Fichaje: cerrar la asistencia abierta de ese empleado (solo check_out), vía cerrar_asistencia",
+    (LEAVE_MODEL, "create"): "Ausencia aprobada en la app: crear su solicitud en Odoo (queda por validar allí), vía crear_ausencia",
 }
+
+
+def permitido(model: str, method: str) -> bool:
+    """¿Se puede llamar a este método de Odoo? Lecturas, siempre; escrituras, solo las de la lista cerrada."""
+    return method in METODOS_LECTURA or (model, method) in ESCRITURAS
+
 
 # Permisos que se comprueban sin ejecutar nada: (modelo, operación, ¿debería tenerlo el usuario técnico?)
 EXPECTED_PERMISSIONS = [
@@ -95,7 +82,6 @@ EXPECTED_PERMISSIONS = [
     (ORDER_LINE_MODEL, "read", True), (MOVE_LINE_MODEL, "read", True),                 # finanzas y centros (solo lectura)
     (ANALYTIC_ACCOUNT_MODEL, "read", True), (ANALYTIC_TAG_MODEL, "read", True),        # catálogo analítico (solo lectura)
 ]
-ALLOWED_CALLS |= {(m, "check_access_rights") for m, _, _ in EXPECTED_PERMISSIONS}
 
 # ---- cuadro de mando financiero: ayudas de dominio y lectura de grupos por fecha --------------------------------------
 DIAS_DETALLE_VENCIMIENTO = 90   # los vencimientos de los últimos 90 días (y los futuros) llegan día a día; lo anterior, en total
@@ -213,7 +199,7 @@ class OdooClient:
         return self._uid
 
     def _call(self, model: str, method: str, args: list, kwargs: dict | None = None):
-        if (model, method) not in ALLOWED_CALLS:
+        if not permitido(model, method):
             raise PermissionError(f"Operación no permitida: {model}.{method}")
         kwargs = dict(kwargs or {})
         kwargs["context"] = {"allowed_company_ids": self.s.company_ids, "lang": "es_ES"}

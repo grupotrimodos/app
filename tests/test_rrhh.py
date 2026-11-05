@@ -230,16 +230,12 @@ def test_chofer_hoy_detecta_camion_de_la_flota_en_modo_simulado(entorno):
     assert c.get("/api/chofer/hoy", headers={"Authorization": "Bearer tok-jefa"}).status_code == 403   # sin permiso de chófer
 
 
-def test_cliente_real_solo_permite_las_operaciones_de_rrhh_previstas():
-    from servicios.odoo_client import ALLOWED_CALLS
-    hr = {c for c in ALLOWED_CALLS if c[0].startswith("hr.")}
-    assert hr == {("hr.attendance", "search_read"), ("hr.attendance", "create"), ("hr.attendance", "write"),
-                  ("hr.leave", "create"), ("hr.attendance", "check_access_rights"), ("hr.leave", "check_access_rights"),
-                  ("hr.leave.type", "search_read"), ("hr.employee", "search_read"), ("hr.employee", "check_access_rights")}
-    # fuera de RRHH, la sincronización solo LEE (flota y aplicaciones instaladas)
-    assert {c for c in ALLOWED_CALLS if c[0] in ("fleet.vehicle", "ir.module.module")} == {
-        ("fleet.vehicle", "search_read"), ("ir.module.module", "search_read")}
-    assert not any(m == "unlink" for _, m in ALLOWED_CALLS)
+def test_cliente_real_solo_escribe_lo_previsto_de_rrhh():
+    from servicios.odoo_client import ESCRITURAS
+    # RRHH solo abre y cierra asistencias y crea solicitudes de ausencia; empleados, tipos y flota solo se leen
+    assert {c for c in ESCRITURAS if c[0].startswith("hr.")} == {
+        ("hr.attendance", "create"), ("hr.attendance", "write"), ("hr.leave", "create")}
+    assert not any(c[0] in ("hr.employee", "hr.leave.type", "fleet.vehicle", "ir.module.module") for c in ESCRITURAS)
 
 
 def test_entrada_con_otra_entrada_abierta_en_odoo_queda_en_error(entorno):
@@ -342,21 +338,12 @@ def test_sin_clave_de_servidor_la_sincronizacion_lo_explica(entorno, monkeypatch
 
 # ------------------------------------------------------------------ cuadro de mando de dirección (Odoo, solo totales)
 
-def test_cuadro_de_mando_solo_lee_totales_de_odoo():
-    from servicios.odoo_client import ALLOWED_CALLS
-    comerciales = {c for c in ALLOWED_CALLS if c[0] in ("crm.lead", "account.move") or c[1] == "read_group"}
-    assert comerciales == {("crm.lead", "read_group"), ("sale.order", "read_group"), ("account.move", "read_group"),
-                           ("sale.order.line", "read_group"), ("account.move.line", "read_group"),
-                           ("crm.lead", "check_access_rights"), ("account.move", "check_access_rights")}
-    # finanzas y centros: líneas de pedido y apuntes, solo agrupados; catálogo analítico, solo lectura de id/nombre
-    finanzas = {c for c in ALLOWED_CALLS if c[0] in ("sale.order.line", "account.move.line") or c[0].startswith("account.analytic")}
-    assert finanzas == {("sale.order.line", "read_group"), ("account.move.line", "read_group"),
-                        ("account.analytic.account", "search_read"), ("account.analytic.tag", "search_read"),
-                        ("sale.order.line", "check_access_rights"), ("account.move.line", "check_access_rights"),
-                        ("account.analytic.account", "check_access_rights"), ("account.analytic.tag", "check_access_rights")}
+def test_cuadro_de_mando_nunca_escribe_en_odoo():
+    from servicios.odoo_client import ESCRITURAS
+    # CRM, ventas, facturas, apuntes y analítica: solo se leen (y el cuadro solo pide totales agrupados)
     solo_lectura = ("crm.lead", "account.move", "sale.order", "sale.order.line", "account.move.line",
                     "account.analytic.account", "account.analytic.tag")
-    assert not any(m in ("write", "create", "unlink") for mod, m in ALLOWED_CALLS if mod in solo_lectura)
+    assert not any(mod in solo_lectura for mod, _ in ESCRITURAS)
 
 
 def test_cuadro_de_mando_exige_su_permiso_y_resume_por_empresa(entorno):

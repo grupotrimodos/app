@@ -138,7 +138,8 @@ def test_sesion_ok_manipulada_y_caducada():
 def test_cliente_real_rechaza_operaciones_no_permitidas():
     from servicios.odoo_client import OdooClient
     c = OdooClient(get_settings())
-    for model, method in [("res.users", "read"), ("tms.package", "unlink"), ("project.task", "write"), ("ir.attachment", "search_read")]:
+    # leer se puede todo; escribir, solo la lista cerrada (y borrar, nunca)
+    for model, method in [("res.users", "write"), ("tms.package", "unlink"), ("project.task", "write"), ("ir.attachment", "create")]:
         with pytest.raises(PermissionError):
             c._call(model, method, [[1]])
 

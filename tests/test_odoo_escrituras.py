@@ -1,4 +1,5 @@
-"""Escrituras en Odoo: solo las dos listas cerradas de AGENTS.md (base 4). Borrar, nunca.
+"""Odoo (AGENTS.md, base 4): leer, cualquier modelo; escribir, solo las dos listas cerradas; borrar, nunca; y ninguna
+ruta de la API lee «el modelo que le pidan» (leer no es enseñar).
 
 Si una prueba de aquí falla porque alguien ha añadido una escritura o una vía nueva hacia Odoo, NO se arregla la
 prueba: se propone el cambio a Félix explicando qué toca y, solo con su permiso expreso, se amplía la lista de aquí.
@@ -13,12 +14,12 @@ import pytest
 import servicios.argon  # noqa: F401  (añade la carpeta de ARGON al path)
 import argon_escritor as ARGON  # noqa: E402
 from servicios.config import get_settings
-from servicios.odoo_client import ALLOWED_CALLS, EDITABLE_FIELDS, REPORT_NAME, OdooClient
+from servicios.odoo_client import EDITABLE_FIELDS, ESCRITURAS, METODOS_LECTURA, REPORT_NAME, OdooClient, permitido
 
 RAIZ = Path(__file__).resolve().parent.parent
 
-# Métodos que solo leen. Cualquier otro método en una lista es una escritura.
-LECTURA = {"search_read", "read", "read_group", "fields_get", "name_search", "search", "search_count", "check_access_rights"}
+# Métodos que solo leen. Cualquier otro método es una escritura.
+LECTURA = {"search_read", "read", "read_group", "search", "search_count", "name_search", "fields_get", "check_access_rights"}
 
 # Lista cerrada de servicios/odoo_client.py: fichajes, ausencias, notas y bultos/peso de DECA.
 ESCRITURAS_APP = {
@@ -44,14 +45,25 @@ def escrituras(lista) -> set[tuple[str, str]]:
 
 
 def test_la_app_solo_escribe_en_odoo_lo_de_su_lista_cerrada():
-    assert escrituras(ALLOWED_CALLS) == ESCRITURAS_APP
+    assert set(ESCRITURAS) == ESCRITURAS_APP
+    assert all(len(explicacion) > 20 and "vía " in explicacion for explicacion in ESCRITURAS.values())   # qué toca y por dónde
+
+
+def test_los_metodos_de_lectura_no_esconden_ninguna_escritura():
+    assert set(METODOS_LECTURA) == LECTURA
+
+
+@pytest.mark.parametrize("modelo", ["hr.employee", "fleet.vehicle", "hr.payslip", "account.move.line", "tms.equipment", "stock.quant"])
+def test_se_puede_leer_cualquier_modelo_pero_no_escribirlo(modelo):
+    assert all(permitido(modelo, m) for m in LECTURA)
+    assert not any(permitido(modelo, m) for m in ("create", "write", "unlink", "copy", "action_confirm", "toggle_active"))
 
 
 def test_argon_solo_escribe_lo_de_su_lista_congelada():
     assert escrituras(ARGON.PERMITIDO) == ESCRITURAS_ARGON
 
 
-@pytest.mark.parametrize("lista", [ALLOWED_CALLS, ARGON.PERMITIDO], ids=["app", "argon"])
+@pytest.mark.parametrize("lista", [set(ESCRITURAS), ARGON.PERMITIDO], ids=["app", "argon"])
 def test_nunca_se_borra_en_odoo(lista):
     assert not [c for c in lista if c[1] == "unlink"]
 
@@ -102,3 +114,19 @@ def test_nadie_mas_habla_con_odoo_por_su_cuenta():
         and PATRON_ODOO.search(p.read_text(encoding="utf-8", errors="ignore"))
     }
     assert encontrados == VIAS_A_ODOO
+
+
+def test_ninguna_ruta_lee_el_modelo_que_le_pidan():
+    """Leer no es enseñar: cada ruta devuelve lo suyo, con su permiso. Ninguna acepta un modelo, un método, un dominio
+    o unos campos de Odoo como parámetro (sería una puerta a nóminas, salarios o contabilidad)."""
+    from servicios.main import app
+    prohibidos = {"modelo", "model", "metodo", "method", "dominio", "domain", "campos", "fields", "res_model"}
+    abiertas = []
+    for r in app.routes:
+        dep = getattr(r, "dependant", None)
+        if dep is None:
+            continue
+        nombres = {p.name for p in dep.query_params + dep.path_params + dep.body_params}
+        if nombres & prohibidos:
+            abiertas.append((r.path, sorted(nombres & prohibidos)))
+    assert not abiertas

@@ -17,10 +17,16 @@ cambiar una función.
       dato está mal se corrige en Odoo y la siguiente foto lo recoge.
    **Antes de crear una tabla en Supabase, comprueba si el dato ya existe en Odoo.**
 4. **Acceso a Odoo:**
-   - Leer: se permite consultar cualquier dato (`search_read`, `read`, `read_group`, `fields_get`).
-   - Escribir: solo la lista cerrada actual de `ALLOWED_CALLS` y `EDITABLE_FIELDS` de `servicios/odoo_client.py`
-     (fichajes, ausencias, notas y bultos/peso de DECA; DECA genera además el PDF de su orden con el informe
-     `tms_reporting.tms_transportation_order`).
+   - Leer: se permite consultar cualquier modelo, solo con los métodos de lectura (`METODOS_LECTURA` de
+     `servicios/odoo_client.py`: `search_read`, `read`, `read_group`, `search`, `search_count`, `name_search`,
+     `fields_get`).
+   - Escribir: solo la lista cerrada `ESCRITURAS` y los campos `EDITABLE_FIELDS` de `servicios/odoo_client.py`
+     (abrir y cerrar asistencias, crear la solicitud de una ausencia aprobada, y nota y bultos/peso de DECA; DECA genera
+     además el PDF de su orden con el informe `tms_reporting.tms_transportation_order`).
+   - **Cómo se escribe** (detalle en `docs/odoo.md`): siempre desde un registro de Supabase que hace de cola, a través de
+     su mapa de `servicios/sincronizacion.py`, con interruptor de modo prueba, sin reenviar nunca lo ya enviado y
+     dejando a la vista el resultado o el error. Solo se crean registros nuevos o se completan los propios (cerrar la
+     asistencia abierta, los campos de DECA); nunca se corrige desde la app lo que alguien ha hecho en Odoo.
    - ARGON (`servicios/argon/`) tiene su propia lista, **congelada tal como está** (`PERMITIDO` en
      `argon_escritor.py`: pedidos de venta y contenedores, solo en el Odoo de pruebas salvo `ARGON_PERMITIR_PRODUCCION=1`).
      Es la segunda y última lista autorizada.
@@ -29,7 +35,8 @@ cambiar una función.
      qué toca. `tests/test_odoo_escrituras.py` falla si una de las dos listas crece, si aparece un borrado o si otro
      archivo habla con Odoo por su cuenta: no se arregla la prueba, se pide permiso.
    - Leer todo no es enseñar todo: cada pantalla y cada ruta filtra por los permisos de quien mira (nóminas, salarios y
-     contabilidad nunca a quien no corresponda).
+     contabilidad nunca a quien no corresponda). No hay rutas genéricas: ninguna acepta un modelo, un dominio o unos
+     campos de Odoo como parámetro (lo vigila la misma prueba).
 5. **Perfiles:** se configuran desde la app con los permisos de `src/lib/permisos.json`. Nunca hacer una página por
    perfil; una página por función, filtrada por permisos y centro.
 6. **Fase actual: piloto de fichaje y vacaciones.** No añadir funciones nuevas; solo limpiar, arreglar y pulir. Lo demás
@@ -55,7 +62,7 @@ cambiar una función.
 - Toda ruta de API nueva exige sesión y permiso (`requiere_permiso` en Python). Un test comprueba que ninguna ruta queda
   abierta.
 - Datos que deban llegar a Odoo: un mapa en `servicios/sincronizacion.py` (nunca envíos sueltos).
-- Odoo: solo a través de `servicios/odoo_client.py` (y ARGON con su lista congelada). Nunca llamadas genéricas.
+- Odoo: solo a través de `servicios/odoo_client.py` (y ARGON con su lista congelada). Nunca rutas genéricas.
   **`DRY_RUN=true` por defecto**; producción v15 solo con el pedido S2621473 y permiso expreso.
 - Al cambiar `public/deca/*`, subir la versión de `CACHE` en `public/deca/sw.js`.
 - **Preguntar antes de `git push`** (el push despliega en Vercel).
