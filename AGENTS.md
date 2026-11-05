@@ -6,12 +6,13 @@ cambiar una función.
 ## Bases del proyecto
 
 1. **Odoo es la base de datos principal y manda en el presente:** empleados, fichajes, vacaciones y su saldo, clientes,
-   proveedores, viajes (tms), stock, facturas y vehículos. Lo que existe en Odoo se lee y se escribe en Odoo, sin copias
-   que se editen.
+   proveedores, viajes (tms), stock, facturas, **chóferes, flota y la documentación de ambos** (carnés, CAP, tarjeta de
+   tacógrafo, ITV, seguros…). Lo que existe en Odoo se lee y se escribe en Odoo, sin copias que se editen.
 2. **Movildata se consulta en directo** (posición, actividad, tacógrafo).
 3. **Supabase guarda solo:**
    a) lo que no va a Odoo: login, perfiles, permisos, centros, enlace persona↔empleado de Odoo, ropa y EPIs,
-      documentación, incidencias, inspecciones y la cola de envíos a Odoo;
+      documentación que no esté en Odoo (la de chóferes y vehículos está en Odoo), incidencias, inspecciones y la cola
+      de envíos a Odoo;
    b) el histórico: fotos periódicas de Odoo y Movildata que solo se añaden y nunca se editan, con fecha y origen. Si un
       dato está mal se corrige en Odoo y la siguiente foto lo recoge.
    **Antes de crear una tabla en Supabase, comprueba si el dato ya existe en Odoo.**

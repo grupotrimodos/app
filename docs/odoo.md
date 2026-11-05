@@ -13,7 +13,12 @@ Nadie tiene que decidir dónde va cada dato: `servicios/sincronizacion.py` tiene
 | Vacaciones y ausencias aprobadas | app → Odoo | Ausencias (`hr_holidays`) |
 | Camiones | Odoo → app | Flota (`fleet`) |
 
-> Por las bases de `AGENTS.md`, fichajes, vacaciones y camiones deben pasar a mandar desde Odoo, sin copias que se editen en la app. Está pendiente de encargos aparte.
+> Por las bases de `AGENTS.md`, deben pasar a mandar desde Odoo, sin copias que se editen en la app (pendiente de encargos aparte):
+> - **Fichajes y vacaciones:** hoy se guardan en Supabase (`fichajes`, `ausencias`) y Odoo recibe una copia.
+> - **Chóferes y flota:** hoy la app copia los camiones de Odoo en `vehiculos` y deja darlos de alta y de baja en Administración → Camiones. Además guarda en `asignaciones` qué camión lleva cada chófer, y en `usuarios` su tarjeta de tacógrafo.
+> - **Documentación de chóferes y vehículos:** hoy se apunta en la app (`documentos`: carnés, CAP, tarjeta, reconocimiento, ITV, seguro, tacógrafo), y ya está en Odoo.
+>
+> Para leerla de Odoo hay que saber en qué modelos y campos está. Eso exige abrir lecturas que hoy no están en la lista de `odoo_client.py` (por ejemplo `fields_get` de empleados y vehículos), un encargo aparte.
 
 - Antes de enviar mira qué aplicaciones están **instaladas** en Odoo; si falta una, ese dato se salta y se explica (nunca se fuerza otro sitio).
 - Se envía **al momento** con cada acción; además hay una **pasada automática** diaria (cron de Vercel a las 4:00 UTC, necesita `CRON_SECRET`) y el botón **Sincronizar ahora** en **Administración → Sincronización** (permiso «Ver y lanzar la sincronización»). Para más pasadas al día: un flujo de n8n que llame a `GET /api/odoo/procesar` con `Authorization: Bearer <CRON_SECRET>`.

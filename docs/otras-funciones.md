@@ -2,6 +2,7 @@
 
 > **Piloto de fichaje y vacaciones:** estas funciones están hechas pero ocultas (sin su permiso en los perfiles). Ver `AGENTS.md`, base 6.
 
+- **Duplicidad con Odoo:** la documentación de chóferes y vehículos (carnés, CAP, tarjeta de tacógrafo, reconocimientos, ITV, seguros) ya está en Odoo, y aquí se apunta otra vez en `documentos`. Por la base 1 de `AGENTS.md` debe leerse de Odoo (encargo aparte). Lo que solo tiene la app (carretillas y sus revisiones, inspecciones e incidencias) se queda en Supabase.
 - **Permisos:** `seguridad.ver` (panel de todos los centros), `seguridad.gestionar` (documentación de todos, carretillas, inspecciones y seguimiento de incidencias), `documentos.propios` («Mi documentación») e `incidencias.reportar`. Quien tiene `vehiculos.gestionar` (Oficina) ve y lleva solo la documentación de los camiones (`/seguridad?ver=vehiculos`).
 - **Qué documentación pide cada puesto** se marca en **Administración → Perfiles** (`perfiles.documentos`). A cada persona se le pide en «Mi documentación» y se le avisa en su inicio de lo que falta o caduca en 30 días. Catálogo de tipos: `src/lib/seguridad.ts`.
 - Las **revisiones** de carretillas y las **inspecciones** son un registro: no se cambian ni se borran. Una revisión «fuera de servicio» deja el equipo fuera de servicio.
