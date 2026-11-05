@@ -44,7 +44,10 @@ MAPAS = [
      "que_hace": "Las ausencias aprobadas se crean en Odoo con el tipo que corresponde por su nombre."},
     {"id": "vehiculos", "nombre": "Camiones", "app_odoo": "fleet", "nombre_app": "Flota",
      "modelo": "fleet.vehicle", "sentido": "odoo_a_app",
-     "que_hace": "Los vehículos activos de la flota de Odoo aparecen solos en la lista de camiones de la app."},
+     "que_hace": "Los vehículos activos de la flota de Odoo aparecen solos en la lista de camiones de la app.",
+     # En pausa: la flota está en Odoo y no se copia a la app (AGENTS.md, base 1). El código se queda para cuando la app
+     # lea la flota directamente de Odoo; mientras, ninguna pasada (ni la del cron) guarda vehículos en Supabase.
+     "pausado": "En pausa: la flota se consulta en Odoo y no se copia a la app."},
 ]
 
 
@@ -157,6 +160,9 @@ def procesar(origen: str) -> dict:
         apps = {m["id"]: None for m in MAPAS}
     resultado: dict[str, dict] = {}
     for m in MAPAS:   # en orden: primero se enlazan las fichas, luego se envía
+        if m.get("pausado"):
+            resultado[m["id"]] = {"estado": "pausado", "detalle": m["pausado"]}
+            continue
         if apps[m["id"]] is False:
             resultado[m["id"]] = {"estado": "sin_app", "detalle": f"En Odoo no está instalada la aplicación «{m['nombre_app']}»."}
             continue

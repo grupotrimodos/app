@@ -297,11 +297,9 @@ def test_sincronizacion_envia_lo_pendiente_de_todos_y_enlaza_fichas(entorno, mon
     assert r["resultado"]["empleados"]["enlazados"] == 1 and sb.tablas["usuarios"][0]["odoo_employee_id"] == 41
     assert r["resultado"]["fichajes"]["enviados"] == 2 and len(odoo.asistencias) == 1
     assert r["resultado"]["ausencias"] == {"estado": "ok", "enviado": 1}
-    assert r["resultado"]["vehiculos"] | {"estado": "ok"} == {"estado": "ok", "en_odoo": 2, "nuevos": 1, "enlazados": 1,
-                                                             "matricula_cambiada": 0}
-    camion = next(v for v in sb.tablas["vehiculos"] if v["matricula"] == "4521 LKM")
-    assert camion["odoo_id"] == 501 and camion["activo"] is True                # existente: se enlaza, no se duplica
-    assert any(v["matricula"] == "9910 NBC" for v in sb.tablas["vehiculos"])    # nuevo de la flota
+    # la flota está en Odoo (AGENTS.md, base 1): su paso está en pausa y no copia ningún vehículo a la app
+    assert r["resultado"]["vehiculos"]["estado"] == "pausado"
+    assert not any(v["matricula"] == "9910 NBC" for v in sb.tablas["vehiculos"])
 
 
 def test_sincronizacion_se_salta_lo_que_no_tiene_su_aplicacion_en_odoo(entorno, monkeypatch):
@@ -309,7 +307,7 @@ def test_sincronizacion_se_salta_lo_que_no_tiene_su_aplicacion_en_odoo(entorno, 
     monkeypatch.setattr(odoo, "instalados", {"hr", "hr_attendance"})
     r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"}).json()["resultado"]
     assert r["ausencias"]["estado"] == "sin_app" and "Ausencias" in r["ausencias"]["detalle"]
-    assert r["vehiculos"]["estado"] == "sin_app"
+    assert r["vehiculos"]["estado"] == "pausado"   # en pausa, esté o no instalada la flota
     assert r["fichajes"]["estado"] == "ok"
     estado = c.get("/api/odoo/estado", headers={"Authorization": "Bearer tok-jefa"}).json()
     assert {m["id"]: m["instalada"] for m in estado["mapas"]} == {
@@ -325,7 +323,7 @@ def test_con_odoo_simulado_no_se_guardan_empleados_ni_camiones_de_prueba(entorno
     antes = len(sb.tablas["vehiculos"])
     r = c.post("/api/odoo/procesar", headers={"Authorization": "Bearer tok-jefa"}).json()["resultado"]
     assert sb.tablas["usuarios"][0]["odoo_employee_id"] is None and len(sb.tablas["vehiculos"]) == antes
-    assert "simulado" in r["vehiculos"]["aviso"]
+    assert r["vehiculos"]["estado"] == "pausado"
     assert sb.tablas["fichajes"][0]["odoo_estado"] == "simulado" and odoo.asistencias == {}   # nada «enviado» a un Odoo de mentira
 
 
