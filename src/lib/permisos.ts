@@ -9,7 +9,6 @@ export const TODOS_LOS_PERMISOS = AREAS.flatMap((a) => a.permisos.map((p) => p.i
 const VALIDOS = new Set(TODOS_LOS_PERMISOS);
 
 export const esPermiso = (p: string) => VALIDOS.has(p);
-export const NOMBRE_PERMISO = new Map(AREAS.flatMap((a) => a.permisos.map((p) => [p.id, p.nombre] as const)));
 /** Permisos para el trabajo propio (fichar, su camión, la flota…): solo cuentan para el menú si vienen de sus perfiles. */
 export const DE_PUESTO = new Set(AREAS.flatMap((a) => a.permisos.filter((p) => p.de_puesto).map((p) => p.id)));
 

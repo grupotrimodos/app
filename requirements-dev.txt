@@ -1,6 +1,6 @@
 -r requirements.txt
 pytest==8.3.4
-# Solo para generar iconos y la prueba de navegador con c?mara simulada:
+# Solo para generar iconos y la prueba de navegador con cámara simulada:
 pillow
 qrcode
 playwright

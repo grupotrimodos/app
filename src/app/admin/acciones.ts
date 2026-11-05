@@ -93,24 +93,6 @@ async function exigirCentro(supabase: Awaited<ReturnType<typeof exigir>>["supaba
   return data?.todos_los_centros ? null : `Elige el centro: el perfil «${data?.nombre ?? ""}» trabaja sobre un centro.`;
 }
 
-/** Deja lista a una persona sin perfil: le asigna puesto y centro y la activa, en un solo paso. */
-export async function configurarUsuario(form: FormData) {
-  const { supabase } = await exigir("admin.usuarios");
-  const id = String(form.get("id"));
-  const perfil = numero(form.get("perfil"));
-  const centro = numero(form.get("centro"));
-  if (!perfil) return volver("Elige su perfil.", "error");
-  const falta = await exigirCentro(supabase, perfil, centro);
-  if (falta) return volver(falta, "error");
-  const { error } = await supabase.from("usuario_perfil").insert({ usuario_id: id, perfil_id: perfil, centro_id: centro });
-  if (error) return volver("No se ha podido asignar el perfil.", "error");
-  const { error: e2 } = await supabase.from("usuarios").update({ activo: true }).eq("id", id);
-  revalidatePath("/admin");
-  revalidatePath("/");
-  if (e2) return volver("Perfil asignado, pero no se ha podido activar. Actívalo en su ficha.", "error");
-  return volver("Listo: ya puede entrar y ve lo de su puesto.");
-}
-
 /** Activa de una vez a varias personas recién llegadas (p. ej. chóferes que han entrado con Google) con el mismo
  *  puesto y centro. */
 export async function configurarVarios(form: FormData) {
