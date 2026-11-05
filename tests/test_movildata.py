@@ -272,3 +272,30 @@ def test_chofer_sin_asignacion_no_consulta_movildata(api, monkeypatch):
     r = api.get("/api/chofer/hoy", headers={"Authorization": "Bearer chofer"})
     assert r.json()["vehiculo"] is None and r.json()["aviso"]
     assert llamadas == []
+
+
+@pytest.mark.parametrize("envoltorio", ["texto", "Data", "Result", "unica"])
+def test_respuestas_envueltas_o_como_texto_se_leen(monkeypatch, envoltorio):
+    datos = respuestas()
+    vehiculos = datos["/Users/GetVehiculos"]
+    datos["/Users/GetVehiculos"] = {
+        "texto": httpx.Response(200, json=json.dumps(vehiculos)),          # JSON codificado dos veces
+        "Data": {"Data": vehiculos, "Total": 5},
+        "Result": {"Result": vehiculos},
+        "unica": {"Ok": True, "Coches": vehiculos},                         # el único campo que es lista
+    }[envoltorio]
+    conectar(monkeypatch, datos)
+    r = movildata.resumen_flota()
+    assert r["estado"] == "conectado" and len(r["vehiculos"]) == 5
+
+
+def test_aviso_del_proveedor_se_explica_sin_mostrarlo(monkeypatch):
+    conectar(monkeypatch, {"/Users/GetVehiculos": {"Message": "ApiKey clave-prueba-no-real no válida"}})
+    r = movildata.resumen_flota()
+    assert r["estado"] == "error" and "aviso en lugar de datos" in r["avisos"][0]
+    assert "clave-prueba-no-real" not in json.dumps(r)
+
+
+def test_forma_no_incluye_valores():
+    f = movildata.forma([{"Matricula": "1234 ABC", "Imei": "secreto"}])
+    assert "Matricula" in f and "1234" not in f and "secreto" not in f

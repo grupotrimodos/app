@@ -106,6 +106,7 @@ npm run dev        # web en http://localhost:3000 + API Python en el puerto 8000
 npx tsc --noEmit && npx next build                         # web
 .venv/bin/python -X utf8 -m scripts.prueba_navegador       # navegador real + cámara simulada (arranca web y API solas)
 .venv/bin/python -X utf8 -m scripts.comprobar_permisos     # permisos del usuario técnico de Odoo, sin escribir
+.venv/bin/python -X utf8 -m scripts.diagnostico_movildata  # forma de las respuestas de Movildata (sin datos ni clave)
 ```
 (En Windows, `.\.venv\Scripts\python.exe` en lugar de `.venv/bin/python`.)
 

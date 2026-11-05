@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
+import logging
 import math
 import os
 import re
@@ -19,7 +21,13 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+log = logging.getLogger("conductores")
 MADRID = ZoneInfo("Europe/Madrid")
+# Algunas cuentas devuelven la lista dentro de un objeto: estos son los nombres habituales del envoltorio.
+ENVOLTORIOS = ("Data", "data", "Datos", "datos", "Result", "result", "Resultado", "resultado", "Items", "items",
+               "Vehiculos", "vehiculos", "Value", "value", "Lista", "lista")
+# Un objeto con alguno de estos campos (y sin lista) es un aviso del proveedor, no datos.
+CAMPOS_AVISO = ("Message", "message", "Mensaje", "mensaje", "Error", "error", "ErrorMessage", "Errores")
 BASE_URL = "https://mapi.movildata.com"
 RUTAS = frozenset({"Users/GetVehiculos", "Users/GetLastLocations", "InfoEco/GetLastConsumptions",
                    "Users/GetDataBetweenDates", "Users/GetGPSData"})
@@ -30,6 +38,20 @@ _cache_lock = threading.Lock()
 
 class MovildataError(Exception):
     """Error seguro para mostrar; no contiene claves, URLs ni respuestas del proveedor."""
+
+
+def forma(datos) -> str:
+    """Cómo es una respuesta (tipo, cuántos y nombres de campos), SIN ningún valor: para el registro del servidor y el
+    diagnóstico. Nunca incluye datos de vehículos ni la clave."""
+    if isinstance(datos, list):
+        if not datos:
+            return "lista vacía"
+        primero = datos[0]
+        detalle = f"con campos {sorted(primero)[:15]}" if isinstance(primero, dict) else f"de {type(primero).__name__}"
+        return f"lista de {len(datos)} {detalle}"
+    if isinstance(datos, dict):
+        return f"objeto con campos {sorted(datos)[:15]}"
+    return type(datos).__name__
 
 
 def _clave() -> str:
@@ -75,7 +97,13 @@ def _consultar(ruta: str, params: dict | None = None):
             if not 200 <= r.status_code < 300:
                 raise MovildataError("Movildata no ha podido responder a esta consulta.")
             datos = r.json()
+            if isinstance(datos, str):   # hay cuentas que devuelven el JSON como texto (codificado dos veces)
+                try:
+                    datos = json.loads(datos)
+                except ValueError:
+                    pass
             if not isinstance(datos, (list, dict)):
+                log.warning("Movildata %s: respuesta inesperada (%s)", ruta, forma(datos))
                 raise MovildataError("Movildata ha enviado una respuesta que no se puede leer.")
     except (httpx.HTTPError, ValueError):
         raise MovildataError("No se ha podido conectar con Movildata. Vuelve a intentarlo.") from None
@@ -90,7 +118,19 @@ def _lista(datos, *, objeto: bool = False) -> list[dict]:
     # GetLastConsumptions documenta un objeto; algunas cuentas devuelven una lista.
     if objeto and isinstance(datos, dict) and ("Imei" in datos or "Matricula" in datos):
         return [datos]
+    if isinstance(datos, dict):
+        # Lista dentro de un envoltorio («Data», «Result»…), o el único campo del objeto que es una lista.
+        listas = [datos[k] for k in ENVOLTORIOS if isinstance(datos.get(k), list)]
+        if not listas:
+            unicas = [v for v in datos.values() if isinstance(v, list)]
+            listas = unicas if len(unicas) == 1 else []
+        if listas:
+            datos = listas[0]
+        elif any(k in datos for k in CAMPOS_AVISO):
+            log.warning("Movildata: aviso en lugar de datos (%s)", forma(datos))
+            raise MovildataError("Movildata ha respondido con un aviso en lugar de datos. Revisa la clave y los servicios contratados.")
     if not isinstance(datos, list) or any(not isinstance(f, dict) for f in datos):
+        log.warning("Movildata: no es una lista de registros (%s)", forma(datos))
         raise MovildataError("Movildata ha enviado una respuesta que no se puede leer.")
     return datos
 
