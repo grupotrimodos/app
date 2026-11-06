@@ -7,10 +7,11 @@ import { llamarPython } from "@/lib/python";
 
 const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/chofer?${tipo}=${encodeURIComponent(msg)}`);
 
+/** Cómo está la jornada; null si no se ha podido leer (entonces no se ficha nada a ciegas). */
 async function estadoJornada(supabase: Awaited<ReturnType<typeof conPermiso>>["supabase"], uid: string) {
-  const { data } = await supabase.from("fichajes").select("tipo,momento").eq("usuario_id", uid)
+  const { data, error } = await supabase.from("fichajes").select("tipo,momento").eq("usuario_id", uid)
     .gte("momento", inicioDia(1).toISOString()).order("momento");
-  return estadoDe((data ?? []) as Fichaje[]);
+  return error ? null : estadoDe((data ?? []) as Fichaje[]);
 }
 
 async function cerrarAbierta(supabase: Awaited<ReturnType<typeof conPermiso>>["supabase"], uid: string) {
@@ -29,20 +30,22 @@ export async function empezarConCamion(form: FormData) {
   if (!(await cerrarAbierta(supabase, uid))) return volver("No se ha podido cerrar el camión anterior.", "error");
   const { error } = await supabase.from("asignaciones").insert({ vehiculo_id, origen });
   if (error) return volver("No se ha podido registrar el camión. Vuelve a elegirlo.", "error");
-  let fichado = false;
-  if ((await estadoJornada(supabase, uid)) === "fuera") {
-    const { error: e } = await supabase.from("fichajes").insert({ tipo: "entrada", origen: "camion" });
-    fichado = !e;
-    if (fichado) await llamarPython("/api/rrhh/fichajes/sincronizar", { method: "POST", body: {} });
-  }
   revalidatePath("/chofer");
-  volver(fichado ? "Camión confirmado y entrada fichada. ¡Buen viaje!" : "Camión confirmado.");
+  const estado = await estadoJornada(supabase, uid);
+  if (estado === null) return volver("Camión confirmado, pero no se ha podido comprobar tu jornada: ficha la entrada en «Fichaje».", "error");
+  if (estado !== "fuera") return volver("Camión confirmado.");
+  const { error: e } = await supabase.from("fichajes").insert({ tipo: "entrada", origen: "camion" });
+  if (e) return volver("Camión confirmado, pero no se ha podido fichar la entrada: fíchala en «Fichaje».", "error");
+  await llamarPython("/api/rrhh/fichajes/sincronizar", { method: "POST", body: {} });
+  volver("Camión confirmado y entrada fichada. ¡Buen viaje!");
 }
 
 export async function finalizarJornada() {
   const { supabase, uid } = await conPermiso("chofer.usar");
   if (!(await cerrarAbierta(supabase, uid))) return volver("No se ha podido cerrar el camión.", "error");
-  if ((await estadoJornada(supabase, uid)) !== "fuera") {
+  const estado = await estadoJornada(supabase, uid);
+  if (estado === null) return volver("Camión cerrado, pero no se ha podido comprobar tu jornada: ficha la salida en «Fichaje».", "error");
+  if (estado !== "fuera") {
     const { error } = await supabase.from("fichajes").insert({ tipo: "salida", origen: "camion" });
     if (error) return volver("Camión cerrado, pero no se ha podido fichar la salida. Fíchala en «Fichaje».", "error");
     await llamarPython("/api/rrhh/fichajes/sincronizar", { method: "POST", body: {} });

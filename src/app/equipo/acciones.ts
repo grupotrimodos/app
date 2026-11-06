@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { conPermiso } from "@/lib/usuario";
 import { madridAInstante } from "@/lib/jornada";
 import { apuntarAusenciaEnOutlook } from "@/lib/outlook";
+import { resultadoEnvio, type EnvioFichajes } from "@/lib/envioOdoo";
 import { llamarPython } from "@/lib/python";
 
 const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/equipo?${tipo}=${encodeURIComponent(msg)}`);
@@ -23,12 +24,12 @@ export async function resolverAusencia(form: FormData) {
   if (error || !data?.length) return volver("No se ha podido resolver (puede que ya esté resuelta o no sea de tu equipo).", "error");
   let odoo = "";
   if (aprobar) {
-    const r = await llamarPython<{ estado: string }>(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });
+    const r = await llamarPython<{ estado: string; detalle?: string }>(`/api/rrhh/ausencias/${id}/sincronizar`, { method: "POST" });
     await apuntarAusenciaEnOutlook(id).catch(() => {});   // en su calendario, si está conectado
     // Quien aprueba sabe si ya está en Odoo (si no, la sincronización automática lo reintenta).
     odoo = { enviado: " Ya está en Odoo.", simulado: " Modo prueba: no se envía a Odoo.",
       sin_empleado: " No ha llegado a Odoo: falta su ficha de empleado (lo arregla la administración).",
-      error: " Odoo no la ha aceptado todavía: se reintentará sola." }[r?.estado ?? "error"] ?? "";
+      error: ` No ha llegado a Odoo${r?.detalle ? `: ${r.detalle}` : " (el servicio no responde: se reintentará sola)"}.` }[r?.estado ?? "error"] ?? "";
   }
   revalidatePath("/equipo");
   revalidatePath("/");
@@ -55,7 +56,8 @@ export async function corregirFichaje(form: FormData) {
 export async function reintentarOdoo(form: FormData) {
   await conPermiso("fichaje.corregir");
   const usuario_id = String(form.get("usuario_id") ?? "");
-  const r = await llamarPython<{ errores: number }>("/api/rrhh/fichajes/sincronizar", { method: "POST", body: { usuario_id } });
+  const r = await llamarPython<EnvioFichajes>("/api/rrhh/fichajes/sincronizar", { method: "POST", body: { usuario_id } });
   revalidatePath("/equipo");
-  volver(r && r.errores === 0 ? "Enviado a Odoo." : "Odoo sigue sin aceptarlo: revisa el fichaje en Odoo.", r && r.errores === 0 ? "ok" : "error");
+  const { texto, bien } = resultadoEnvio(r, "su");
+  volver(bien ? texto : `${texto} Revisa el fichaje en Odoo.`, bien ? "ok" : "error");
 }

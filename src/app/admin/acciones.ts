@@ -68,6 +68,9 @@ export async function crearUsuarioPin(form: FormData) {
 export async function guardarUsuario(form: FormData) {
   const { supabase, uid, perfil: yo } = await exigir("admin.usuarios");
   const id = String(form.get("id"));
+  // El id de empleado de Odoo: vacío (se busca solo) o un número. Otra cosa no se guarda: borraría el enlace con Odoo.
+  const idOdoo = String(form.get("odoo_employee_id") ?? "").trim();
+  if (idOdoo && !/^\d{1,9}$/.test(idOdoo)) return volver("El id de empleado de Odoo tiene que ser un número (o dejarlo vacío).", "error");
   const cambios: Record<string, unknown> = {
     nombre: String(form.get("nombre") ?? "").trim(),
     activo: form.get("activo") === "on",
@@ -151,7 +154,8 @@ export async function asignarPerfil(form: FormData) {
 
 export async function quitarPerfil(form: FormData) {
   const { supabase } = await exigir("admin.usuarios");
-  await supabase.from("usuario_perfil").delete().eq("id", Number(form.get("asignacion")));
+  const { data, error } = await supabase.from("usuario_perfil").delete().eq("id", Number(form.get("asignacion"))).select("id");
+  if (error || !data?.length) return volver("No se ha podido quitar el perfil.", "error");
   revalidatePath("/admin");
   return volver("Perfil quitado.");
 }

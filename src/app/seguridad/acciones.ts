@@ -70,7 +70,10 @@ export async function anotarRevision(form: FormData) {
   if (proxima) cambios.proxima_revision = proxima;
   if (resultado === "fuera_de_servicio") cambios.activo = false;
   if (resultado === "correcto" && form.get("reactivar") === "on") cambios.activo = true;
-  if (Object.keys(cambios).length) await supabase.from("equipos").update(cambios).eq("id", equipo_id);
+  if (Object.keys(cambios).length) {
+    const { error: e2 } = await supabase.from("equipos").update(cambios).eq("id", equipo_id);
+    if (e2) return volver("almacenes", "Revisión anotada, pero no se ha podido cambiar el estado del equipo. Cámbialo a mano.", "error");
+  }
   hecho("almacenes", resultado === "fuera_de_servicio" ? "Revisión anotada. El equipo queda fuera de servicio." : "Revisión anotada.");
 }
 
