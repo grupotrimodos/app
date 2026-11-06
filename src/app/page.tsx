@@ -206,7 +206,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       {!perfil || !perfil.activo ? <section className="panel inicio-sin-acceso"><Icono nombre="escudo" size={36} />
         <h2>Estamos preparando tu acceso</h2><p>Tu usuario está pendiente de activar. Avisa a la oficina para empezar a usar tus herramientas.</p>
       </section> : mias.length === 0 ? <section className="panel inicio-sin-acceso"><Icono nombre="equipo" size={36} />
-        <h2>Tu espacio está listo</h2><p>Pide a la oficina que te asigne un perfil para ver las herramientas de tu puesto.</p>
+        <h2>Todavía no tienes herramientas</h2><p>Tu perfil aún no tiene nada activo. Avisa a la oficina para que revise tu puesto.</p>
       </section> : <>
         {docsPendientes.length > 0 && <section className="panel inicio-avisos" aria-labelledby="avisos-titulo">
           <h2 id="avisos-titulo"><Icono nombre="aviso" size={20} />Tienes documentación por poner al día</h2>

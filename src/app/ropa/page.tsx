@@ -27,10 +27,9 @@ const CAMPOS = "id,usuario_id,creado,prendas,motivo,nota,estado,comentario,entre
 const Etiqueta = ({ estado }: { estado: string }) => <span className={`etiqueta ${CLASE_ROPA[estado] ?? ""}`}>{ESTADO_ROPA[estado] ?? estado}</span>;
 
 /** Las cuatro tallas de una persona (la de arriba, pantalón, calzado y guantes). */
-function FormTallas({ tallas, usuario, volver, boton = "Guardar mis tallas" }: { tallas: Tallas | null; usuario?: string; volver: string; boton?: string }) {
+function FormTallas({ tallas, usuario, boton = "Guardar mis tallas" }: { tallas: Tallas | null; usuario?: string; boton?: string }) {
   return <form action={guardarTallas} className="ropa-tallas">
     {usuario && <input type="hidden" name="usuario" value={usuario} />}
-    <input type="hidden" name="volver" value={volver} />
     {Object.entries(GRUPOS_TALLA).map(([g, d]) => <div key={g}>
       <label htmlFor={`t-${usuario ?? "yo"}-${g}`}>{d.nombre}</label>
       <select id={`t-${usuario ?? "yo"}-${g}`} name={`talla_${g}`} defaultValue={tallas?.[g as keyof Tallas] ?? ""}>
@@ -105,7 +104,7 @@ async function MiRopa({ uid, temporada }: { uid: string; temporada: string }) {
     <section className="panel">
       <h2>Mis tallas</h2>
       <p className="hint">Con ellas tu responsable prepara tu ropa. Cámbialas cuando quieras.</p>
-      <FormTallas tallas={tallas} volver="/ropa?ver=mia" />
+      <FormTallas tallas={tallas} />
     </section>
 
     <section className="panel">
@@ -197,7 +196,6 @@ async function Temporada({ uid, esAdmin, temporada, centro, todas }: { uid: stri
     for (const [k, v] of Object.entries(extra)) if (v === undefined) q.delete(k); else q.set(k, v);
     return `/ropa?${q}`;
   };
-  const volver = "/ropa?ver=temporada";
 
   return <>
     <div className="cm-cifras ropa-cifras">
@@ -258,17 +256,17 @@ async function Temporada({ uid, esAdmin, temporada, centro, todas }: { uid: stri
             <div className="ropa-persona-accion">
               <span className={`etiqueta ${CLASE_DOTACION[d.estado]}`}>{d.estado === "entregada" ? "Sin confirmar" : ESTADO_DOTACION[d.estado]}</span>
               {d.estado === "por_entregar" && <form action={entregarDotacion}>
-                <input type="hidden" name="id" value={d.id} /><input type="hidden" name="volver" value={volver} />
+                <input type="hidden" name="id" value={d.id} />
                 <button className="btn pequeno primario" disabled={faltan.length > 0} title={faltan.length ? "Primero apunta sus tallas" : undefined}>Entregada</button>
               </form>}
               {d.estado === "entregada" && <form action={entregarDotacion}>
-                <input type="hidden" name="id" value={d.id} /><input type="hidden" name="deshacer" value="1" /><input type="hidden" name="volver" value={volver} />
+                <input type="hidden" name="id" value={d.id} /><input type="hidden" name="deshacer" value="1" />
                 <button className="btn pequeno">Deshacer</button>
               </form>}
             </div>
             {d.estado === "por_entregar" && <details className="ropa-persona-tallas" open={faltan.length > 0 && visibles.length <= 5}>
               <summary>{faltan.length ? "Apuntar sus tallas" : "Cambiar sus tallas"}</summary>
-              <FormTallas tallas={tallas} usuario={d.usuario_id} volver={volver} boton="Guardar tallas" />
+              <FormTallas tallas={tallas} usuario={d.usuario_id} boton="Guardar tallas" />
             </details>}
           </li>;
         })}
@@ -349,7 +347,6 @@ async function Composicion() {
           const k = kitDe(p.id, t);
           return <form key={t} action={guardarKit} className="cm-panel">
             <input type="hidden" name="perfil" value={p.id} /><input type="hidden" name="temporada" value={t} />
-            <input type="hidden" name="volver" value="/ropa?ver=composicion" />
             <h3>{t === "verano" ? "Verano (abril–septiembre)" : "Invierno (octubre–marzo)"}</h3>
             <div className="tabla-ropa">
               {Object.entries(PRENDAS).map(([id, prenda]) => <div key={id} className="fila-ropa kit">

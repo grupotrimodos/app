@@ -37,12 +37,13 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
         ],
       },
-      // Administración y «Mi equipo» vuelven a la misma pestaña, centro y filtros leyendo de qué página viene la acción
+      // Administración, «Mi equipo» y Ropa vuelven a la misma pestaña, centro y filtros leyendo de qué página viene la acción
       // (src/lib/volver.ts):
       // ahí el navegador dice su página de origen, pero solo dentro de la propia app (a otras webs, nunca).
       { source: "/admin", headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
       { source: "/admin/:path*", headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
       { source: "/equipo", headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
+      { source: "/ropa", headers: [{ key: "Referrer-Policy", value: "same-origin" }] },
       { source: "/deca/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] },
       { source: "/deca/manifest.webmanifest", headers: [{ key: "Content-Type", value: "application/manifest+json" }] },
     ];
