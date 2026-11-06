@@ -1,13 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { conPermiso } from "@/lib/usuario";
 import { madridAInstante } from "@/lib/jornada";
 import { apuntarAusenciaEnOutlook } from "@/lib/outlook";
 import { resultadoEnvio, type EnvioFichajes } from "@/lib/envioOdoo";
 import { llamarPython } from "@/lib/python";
+import { volverA } from "@/lib/volver";
 
-const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/equipo?${tipo}=${encodeURIComponent(msg)}`);
+/** Vuelve a «Mi equipo» con el mismo centro elegido, y el mensaje. */
+const volver = (msg: string, tipo: "ok" | "error" = "ok") => volverA("/equipo", msg, tipo);
 
 
 // Cada acción exige su permiso; además, la base de datos solo deja actuar sobre personas de los centros propios.
@@ -35,7 +36,7 @@ export async function resolverAusencia(form: FormData) {
   }
   revalidatePath("/equipo");
   revalidatePath("/");
-  volver(aprobar ? `Ausencia aprobada.${odoo}` : "Ausencia rechazada.");
+  return volver(aprobar ? `Ausencia aprobada.${odoo}` : "Ausencia rechazada.");
 }
 
 export async function corregirFichaje(form: FormData) {
@@ -52,7 +53,7 @@ export async function corregirFichaje(form: FormData) {
   if (error) return volver("No se ha podido guardar la corrección.", "error");
   await llamarPython("/api/rrhh/fichajes/sincronizar", { method: "POST", body: { usuario_id } });
   revalidatePath("/equipo");
-  volver("Corrección anotada.");
+  return volver("Corrección anotada.");
 }
 
 export async function reintentarOdoo(form: FormData) {
@@ -61,5 +62,5 @@ export async function reintentarOdoo(form: FormData) {
   const r = await llamarPython<EnvioFichajes>("/api/rrhh/fichajes/sincronizar", { method: "POST", body: { usuario_id } });
   revalidatePath("/equipo");
   const { texto, bien } = resultadoEnvio(r, "su");
-  volver(bien ? texto : `${texto} Revisa el fichaje en Odoo.`, bien ? "ok" : "error");
+  return volver(bien ? texto : `${texto} Revisa el fichaje en Odoo.`, bien ? "ok" : "error");
 }

@@ -1,7 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { volverA } from "@/lib/volver";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esPermiso } from "@/lib/permisos";
 import { DOCUMENTOS_PERSONA } from "@/lib/seguridad";
@@ -16,18 +15,7 @@ async function exigir(permiso: string) {
 }
 
 /** Vuelve a la misma pestaña de Administración, con sus filtros, y el mensaje. */
-async function volver(msg: string, tipo: "ok" | "error" = "ok"): Promise<never> {
-  let destino = "/admin";
-  try {
-    const u = new URL((await headers()).get("referer") ?? "");
-    if (u.pathname === "/admin") {
-      u.searchParams.delete("ok");
-      u.searchParams.delete("error");
-      destino = `/admin${u.search}`;
-    }
-  } catch { /* sin «referer»: a la portada de Administración */ }
-  redirect(`${destino}${destino.includes("?") ? "&" : "?"}${tipo}=${encodeURIComponent(msg)}`);
-}
+const volver = (msg: string, tipo: "ok" | "error" = "ok") => volverA("/admin", msg, tipo);
 
 const numero = (v: FormDataEntryValue | null) => Number(v || 0) || null;
 
