@@ -14,3 +14,4 @@ Reglas y bases del proyecto: [`../AGENTS.md`](../AGENTS.md). Puesta en marcha: [
 | [otras-funciones.md](otras-funciones.md) | Seguridad, cuadro de mando, ropa, zonas y calendario (ocultas en el piloto) |
 | [nueva-funcion.md](nueva-funcion.md) | Cómo se añade una función (fuera del piloto) |
 | [scripts.md](scripts.md) | Para qué sirve cada script |
+| [base-de-datos.md](base-de-datos.md) | Columnas que no se usan o solo sirven de registro (revisión del 6-11-2026) |
