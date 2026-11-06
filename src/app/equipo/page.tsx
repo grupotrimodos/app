@@ -2,7 +2,7 @@ import Link from "next/link";
 import SinEnvioConIntro from "../SinEnvioConIntro";
 import Cabecera from "../Cabecera";
 import EstadoOdoo from "../EstadoOdoo";
-import { centrosConPermiso, conPermiso } from "@/lib/usuario";
+import { alcanceCentros, conPermiso } from "@/lib/usuario";
 import { permisosDe } from "@/lib/permisos";
 import {
   duracion, estadoDe, fecha, hora, hoyISO, inicioDia, jornadaEnCurso, minutosTrabajados, NOMBRE_AUSENCIA, NOMBRE_ESTADO, NOMBRE_TIPO,
@@ -22,9 +22,10 @@ type Ausencia = { id: number; usuario_id: string; tipo: string; desde: string; h
 
 export default async function PaginaEquipo({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string; centro?: string }> }) {
   const { supabase, uid, perfil, puede, veArea } = await conPermiso(...permisosDe("equipo"));
-  const conCentro = await centrosConPermiso(supabase, uid, perfil.es_admin, permisosDe("equipo"));
-  // El administrador ve también a quien todavía no tiene centro (si no, sus solicitudes no le llegarían a nadie).
-  const centros = perfil.es_admin ? [...conCentro, { id: SIN_CENTRO, nombre: "Sin centro" }] : conCentro;
+  const { centros: conCentro, todos } = await alcanceCentros(supabase, uid, perfil.es_admin, permisosDe("equipo"));
+  // Quien lleva todos los centros (superadministrador o un perfil «todos los centros», como Administrador) ve también a
+  // quien todavía no tiene centro: si no, nadie vería ni corregiría sus fichajes.
+  const centros = todos ? [...conCentro, { id: SIN_CENTRO, nombre: "Sin centro" }] : conCentro;
   const verEquipo = puede("equipo.ver"), aprobar = puede("ausencias.aprobar"), corregir = puede("fichaje.corregir");
   const { ok, error, centro } = await searchParams;
   if (centros.length === 0) {

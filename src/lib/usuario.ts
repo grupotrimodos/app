@@ -61,17 +61,22 @@ export async function conPermiso(...ps: string[]) {
 /** Centros en los que el usuario tiene alguno de estos permisos. Todos si es superadministrador o si alguno de
  *  sus perfiles con ese permiso vale «en todos los centros». */
 export async function centrosConPermiso(supabase: Supabase, uid: string, esAdmin: boolean, ps: string[]) {
-  const todos = async () => {
+  return (await alcanceCentros(supabase, uid, esAdmin, ps)).centros;
+}
+
+/** Como centrosConPermiso, y además si vale en todos (entonces también alcanza a quien todavía no tiene centro). */
+export async function alcanceCentros(supabase: Supabase, uid: string, esAdmin: boolean, ps: string[]) {
+  const todosLos = async () => {
     const { data } = await supabase.from("centros").select("id,nombre").order("nombre");
-    return (data ?? []) as { id: number; nombre: string }[];
+    return { centros: (data ?? []) as { id: number; nombre: string }[], todos: true };
   };
-  if (esAdmin) return todos();
+  if (esAdmin) return todosLos();
   const { data } = await supabase.from("usuario_perfil")
     .select("centro_id, perfiles(permisos,todos_los_centros), centros(id,nombre)").eq("usuario_id", uid);
   type Fila = { centro_id: number | null; perfiles: { permisos: string[]; todos_los_centros: boolean }; centros: { id: number; nombre: string } | null };
   const conPermiso = ((data ?? []) as unknown as Fila[]).filter((f) => f.perfiles?.permisos.some((p) => ps.includes(p)));
-  if (conPermiso.some((f) => f.perfiles.todos_los_centros)) return todos();
+  if (conPermiso.some((f) => f.perfiles.todos_los_centros)) return todosLos();
   const vistos = new Map<number, { id: number; nombre: string }>();
   for (const f of conPermiso) if (f.centros) vistos.set(f.centros.id, f.centros);
-  return [...vistos.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  return { centros: [...vistos.values()].sort((a, b) => a.nombre.localeCompare(b.nombre)), todos: false };
 }
