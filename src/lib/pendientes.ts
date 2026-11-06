@@ -39,10 +39,13 @@ export const misPendientes = cache(async function misPendientes() {
     conRopa ? supabase.from("ropa_dotaciones").select("prendas,estado").eq("usuario_id", uid).eq("temporada", temporada)
       .maybeSingle<{ prendas: LineaKit[]; estado: string }>() : null,
     conRopa ? supabase.from("tallas_ropa").select("tallas").eq("usuario_id", uid).maybeSingle<{ tallas: Tallas }>() : null,
-    supabase.from("ausencias").select("id,tipo,desde,hasta,estado,resuelto_en").eq("usuario_id", uid).gte("resuelto_en", hace7),
-    supabase.from("solicitudes_ropa").select("id,estado,resuelto_en,entregado_en").eq("usuario_id", uid)
-      .or(`resuelto_en.gte.${hace7},entregado_en.gte.${hace7}`),
-    supabase.from("incidencias").select("id,tipo,cerrada_en").eq("reportado_por", uid).gte("cerrada_en", hace7),
+    // Novedades de lo que pidió, solo si todavía puede abrir esa pantalla (si no, el aviso llevaría a ninguna parte).
+    puede("ausencias.pedir") ? supabase.from("ausencias").select("id,tipo,desde,hasta,estado,resuelto_en").eq("usuario_id", uid)
+      .gte("resuelto_en", hace7) : null,
+    conRopa ? supabase.from("solicitudes_ropa").select("id,estado,resuelto_en,entregado_en").eq("usuario_id", uid)
+      .or(`resuelto_en.gte.${hace7},entregado_en.gte.${hace7}`) : null,
+    puede("incidencias.reportar") ? supabase.from("incidencias").select("id,tipo,cerrada_en").eq("reportado_por", uid)
+      .gte("cerrada_en", hace7) : null,
   ]);
 
   const tareas: Tarea[] = [];
@@ -95,16 +98,16 @@ export const misPendientes = cache(async function misPendientes() {
   type A = { id: number; tipo: string; desde: string; hasta: string; estado: string; resuelto_en: string };
   type R = { id: number; estado: string; resuelto_en: string | null; entregado_en: string | null };
   const novedades: Novedad[] = [
-    ...((misAus.data ?? []) as A[]).filter((a) => a.estado === "aprobada" || a.estado === "rechazada").map((a) => ({
+    ...((misAus?.data ?? []) as A[]).filter((a) => a.estado === "aprobada" || a.estado === "rechazada").map((a) => ({
       cuando: a.resuelto_en, href: "/ausencias", bien: a.estado === "aprobada",
       texto: `${a.estado === "aprobada" ? "Aprobadas" : "Rechazadas"} tus ${(NOMBRE_AUSENCIA[a.tipo] ?? "ausencias").toLowerCase()} del ${fecha(a.desde + "T12:00:00Z")}`,
     })),
-    ...((miRopa.data ?? []) as R[]).filter((r) => r.estado !== "anulada" && r.estado !== "pendiente").map((r) => ({
+    ...((miRopa?.data ?? []) as R[]).filter((r) => r.estado !== "anulada" && r.estado !== "pendiente").map((r) => ({
       cuando: (r.entregado_en ?? r.resuelto_en)!, href: "/ropa", bien: r.estado === "rechazada" ? false : true,
       texto: { aprobada: "Aprobado tu pedido de ropa: te avisarán al entregarlo", entregada: "Entregado tu pedido de ropa",
         rechazada: "Rechazado tu pedido de ropa" }[r.estado] ?? "Tu pedido de ropa ha cambiado",
     })),
-    ...((misInc.data ?? []) as { id: number; cerrada_en: string }[]).map((i) => ({
+    ...((misInc?.data ?? []) as { id: number; cerrada_en: string }[]).map((i) => ({
       cuando: i.cerrada_en, href: "/incidencias", bien: null, texto: "Seguridad ha cerrado una incidencia que avisaste",
     })),
   ].sort((a, b) => b.cuando.localeCompare(a.cuando));

@@ -380,7 +380,8 @@ export default async function CuadroDeMando({ ver, empresa = "", base = "/" }: {
   const ahora = new Date();
   const fechaTexto = ahora.toLocaleDateString("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const p = r?.pendientes;
-  const porResolver = p ? p.vacaciones + p.ropa + p.ropa_entregar + p.por_configurar + p.odoo_error : 0;
+  const porResolver = p ? (puede("ausencias.aprobar") ? p.vacaciones : 0) + (puede("ropa.gestionar") ? p.ropa + p.ropa_entregar : 0)
+    + (puede("admin.usuarios") ? p.por_configurar : 0) + (puede("admin.sincronizacion") ? p.odoo_error : 0) : 0;
   const presencia = r ? pct(r.fichados, r.plantilla - r.ausentes) : 0;
   const media = r ? (() => { const d = r.fichados_dias.slice(0, -1).filter((x) => x.n > 0); return d.length ? d.reduce((s, x) => s + x.n, 0) / d.length : 0; })() : 0;
 
