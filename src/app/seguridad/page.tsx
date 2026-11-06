@@ -23,7 +23,7 @@ const PESTANAS = [
 type Vehiculo = { id: number; matricula: string; modelo: string | null };
 type Usuario = { id: string; nombre: string; email: string | null; codigo: string | null; activo: boolean };
 type Equipo = { id: number; tipo: string; nombre: string; marca_modelo: string | null; centro_id: number | null; proxima_revision: string | null; activo: boolean };
-type Revision = { equipo_id: number; fecha: string; tipo: string; resultado: string };
+type Revision = { equipo_id: number; fecha: string; tipo: string; resultado: string; nota: string | null };
 type Inspeccion = { id: number; centro_id: number | null; lugar: string | null; fecha: string; resultado: string; deficiencias: string | null; proxima: string | null };
 type Incidencia = {
   id: number; reportado_por: string; ocurrio: string; tipo: string; gravedad: string; lugar: string | null; vehiculo_id: number | null;
@@ -58,7 +58,7 @@ function FormDocumento({ accion, campo, valor, tipo, nombre, doc }: {
 }
 
 export default async function Seguridad({ searchParams }: { searchParams: Promise<{ ver?: string; ok?: string; error?: string }> }) {
-  const { supabase, perfil, veArea, puede } = await conPermiso("seguridad.ver", "seguridad.gestionar", "vehiculos.gestionar");
+  const { supabase, perfil, puede } = await conPermiso("seguridad.ver", "seguridad.gestionar", "vehiculos.gestionar");
   const { ver: pedida, ok, error } = await searchParams;
   const veTodo = puede("seguridad.ver", "seguridad.gestionar");
   const gestiona = puede("seguridad.gestionar");
@@ -74,7 +74,7 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
     veTodo ? supabase.from("usuarios").select("id,nombre,email,codigo,activo").returns<Usuario[]>() : null,
     veTodo ? supabase.from("usuario_perfil").select("usuario_id,perfiles(documentos)") : null,
     veTodo ? supabase.from("equipos").select("id,tipo,nombre,marca_modelo,centro_id,proxima_revision,activo").order("tipo").order("nombre").returns<Equipo[]>() : null,
-    veTodo ? supabase.from("equipo_revisiones").select("equipo_id,fecha,tipo,resultado").order("fecha", { ascending: false }).limit(300).returns<Revision[]>() : null,
+    veTodo ? supabase.from("equipo_revisiones").select("equipo_id,fecha,tipo,resultado,nota").order("fecha", { ascending: false }).limit(300).returns<Revision[]>() : null,
     veTodo ? supabase.from("inspecciones").select("id,centro_id,lugar,fecha,resultado,deficiencias,proxima").order("fecha", { ascending: false }).limit(50).returns<Inspeccion[]>() : null,
     // Todas las abiertas (ninguna se pierde por antigua) y las últimas cerradas.
     veTodo ? supabase.from("incidencias").select(CAMPOS_INCIDENCIA).neq("estado", "cerrada")
@@ -129,7 +129,7 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
   const cuenta = (e: Caducidad) => urgente.filter((u) => u.estado === e).length;
 
   return <>
-    <Cabecera nombre={perfil.nombre || perfil.email || perfil.codigo || ""} admin={veArea("admin")} />
+    <Cabecera nombre={perfil.nombre || perfil.email || perfil.codigo || ""} />
     <main className="contenido">
       <h1>Seguridad</h1>
       <p className="lead">Caducidades de vehículos y personas, carretillas, inspecciones de almacén e incidencias. Se avisa 30 días antes.</p>
@@ -205,7 +205,8 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
                 <td><b>{TIPOS_EQUIPO[e.tipo] ?? e.tipo} {e.nombre}</b>{e.marca_modelo && <div className="hint">{e.marca_modelo}</div>}
                   {!e.activo && <span className="etiqueta mal">Fuera de servicio</span>}</td>
                 <td>{e.centro_id ? nombreCentro.get(e.centro_id) : "—"}</td>
-                <td>{r ? <>{fechaLarga(r.fecha)}<div className="hint">{TIPOS_REVISION[r.tipo]} · {RESULTADO_REVISION[r.resultado]}</div></> : <span className="hint">Ninguna</span>}</td>
+                <td>{r ? <>{fechaLarga(r.fecha)}<div className="hint">{TIPOS_REVISION[r.tipo]} · {RESULTADO_REVISION[r.resultado]}</div>
+                  {r.nota && <div className="hint">«{r.nota}»</div>}</> : <span className="hint">Ninguna</span>}</td>
                 <td><Estado estado={caducidad(e.proxima_revision, hoy)} caduca={e.proxima_revision} /></td>
               </tr>;
             })}</tbody>

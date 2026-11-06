@@ -21,7 +21,7 @@ type Ausencia = { id: number; usuario_id: string; tipo: string; desde: string; h
   odoo_estado: string; odoo_error: string | null };
 
 export default async function PaginaEquipo({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string; centro?: string }> }) {
-  const { supabase, uid, perfil, puede, veArea } = await conPermiso(...permisosDe("equipo"));
+  const { supabase, uid, perfil, puede } = await conPermiso(...permisosDe("equipo"));
   const { centros: conCentro, todos } = await alcanceCentros(supabase, uid, perfil.es_admin, permisosDe("equipo"));
   // Quien lleva todos los centros (superadministrador o un perfil «todos los centros», como Administrador) ve también a
   // quien todavía no tiene centro: si no, nadie vería ni corregiría sus fichajes.
@@ -30,7 +30,7 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
   const { ok, error, centro } = await searchParams;
   if (centros.length === 0) {
     return <>
-      <Cabecera nombre={perfil.nombre || perfil.email || ""} admin={veArea("admin")} />
+      <Cabecera nombre={perfil.nombre || perfil.email || ""} />
       <main className="contenido estrecho"><h1>Mi equipo</h1>
         <section className="panel"><p>Tienes el perfil de responsable, pero <b>sin ningún centro asignado</b>, así que todavía no
           tienes a nadie a tu cargo. Pide a la administración que te asigne el perfil en tu centro.</p></section></main>
@@ -103,7 +103,7 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.email || ""} admin={veArea("admin")} />
+      <Cabecera nombre={perfil.nombre || perfil.email || ""} />
       <main className="contenido">
         <div className="admin-cabecera"><h1>Mi equipo</h1>
           {puede("zonas.gestionar") && <Link className="btn pequeno" href="/equipo/zonas">Chóferes por cliente o ruta</Link>}</div>

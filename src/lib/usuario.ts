@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { AREAS, DE_PUESTO, RANGO_PANTALLA, TODOS_LOS_PERMISOS, permisosDe, type Pantalla } from "@/lib/permisos";
+import { AREAS, DE_PUESTO, RANGO_PANTALLA, TODOS_LOS_PERMISOS, type Pantalla } from "@/lib/permisos";
 
 export type Perfil = {
   id: string;
@@ -33,8 +33,6 @@ export const usuarioActual = cache(async function usuarioActual() {
   const puede = (...ps: string[]) => ps.some((p) => permisos.has(p));
   /** ¿Tiene alguno de estos permisos en sus perfiles? Para lo personal del puesto: su camión, su documentación. */
   const esDeSuPuesto = (...ps: string[]) => ps.some((p) => propios.has(p));
-  /** ¿Tiene algún permiso de esta área? (acceso a su página) */
-  const veArea = (area: string) => puede(...permisosDe(area));
   /** ¿Sale en su menú? Los permisos de gestión cuentan siempre; los del trabajo propio (fichar, la flota, DECA…), solo si
    *  vienen de sus perfiles: al superadministrador no se le llena el menú con lo de otros puestos. */
   const enMenu = (area: string) => {
@@ -48,7 +46,7 @@ export const usuarioActual = cache(async function usuarioActual() {
   const pantalla: Pantalla | null = !perfil?.activo ? null
     : pantallas.length ? pantallas.reduce((a, b) => (RANGO_PANTALLA[b] > RANGO_PANTALLA[a] ? b : a))
     : perfil.es_admin ? "direccion" : propios.size ? "oficina" : null;
-  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, veArea, enMenu, pantalla };
+  return { supabase, uid, perfil, permisos, puede, esDeSuPuesto, enMenu, pantalla };
 });
 
 /** Usuario activo con alguno de los permisos indicados; si no, vuelve al inicio. */

@@ -7,7 +7,7 @@ import Navegacion, { VolverAlInicio } from "./Navegacion";
 
 const CONTEXTO = { direccion: "Dirección · Grupo Trimodos", oficina: "Tu espacio Trimodos", campo: "Grupo Trimodos" } as const;
 
-export default async function Cabecera({ nombre }: { nombre?: string; admin?: boolean }) {
+export default async function Cabecera({ nombre }: { nombre?: string }) {
   if (nombre === undefined) {
     return <header className="shell-public-header">
       <Link href="/" aria-label="Grupo Trimodos, inicio"><img src="/deca/img/trimodos.png" alt="Grupo Trimodos" /></Link>

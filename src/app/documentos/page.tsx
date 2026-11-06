@@ -8,13 +8,13 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Mi documentación · Grupo Trimodos" };
 
 export default async function MiDocumentacion({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, uid, perfil, veArea } = await conPermiso("documentos.propios");
+  const { supabase, uid, perfil } = await conPermiso("documentos.propios");
   const { ok, error } = await searchParams;
   const { situacion } = await documentosDe(supabase, uid);
   const pendientes = situacion.filter((s) => s.estado !== "al_dia").length;
 
   return <>
-    <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
+    <Cabecera nombre={perfil.nombre || perfil.codigo || ""} />
     <main className="contenido estrecho">
       <h1>Mi documentación</h1>
       <p className="lead">Apunta cuándo caduca cada documento de tu puesto. Te avisaremos {DIAS_AVISO} días antes.</p>

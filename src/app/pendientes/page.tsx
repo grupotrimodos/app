@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Pendientes · Grupo Trimodos" };
 
 export default async function Pendientes() {
-  const [{ perfil, veArea }, { tareas, novedades }] = await Promise.all([usuarioActual(), misPendientes()]);
+  const [{ perfil }, { tareas, novedades }] = await Promise.all([usuarioActual(), misPendientes()]);
   if (!perfil?.activo) redirect("/");
   const porHacer = tareas.filter((t) => t.cantidad);
   const alDia = tareas.filter((t) => t.cantidad === 0);
 
   return <>
-    <Cabecera nombre={perfil.nombre || perfil.email || perfil.codigo || ""} admin={veArea("admin")} />
+    <Cabecera nombre={perfil.nombre || perfil.email || perfil.codigo || ""} />
     <main className="contenido estrecho">
       <h1>Pendientes</h1>
       <p className="lead">Lo que te toca resolver y las respuestas a lo que has pedido en los últimos 7 días.</p>

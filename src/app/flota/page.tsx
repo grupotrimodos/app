@@ -15,9 +15,9 @@ async function Resumen() {
 }
 
 export default async function PaginaFlota() {
-  const { perfil, veArea } = await conPermiso("flota.ver");
+  const { perfil } = await conPermiso("flota.ver");
   return <>
-    <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
+    <Cabecera nombre={perfil.nombre || perfil.codigo || ""} />
     <main className="contenido flota-page" id="contenido">
       <Suspense fallback={<section className="panel flota-carga" role="status" aria-busy="true">
         <p className="flota-antetitulo">CENTRO DE FLOTA</p><h1>Conectando con tu flota</h1>

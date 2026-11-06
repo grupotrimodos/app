@@ -10,7 +10,7 @@ export const metadata = { title: "Incidencias · Grupo Trimodos" };
 type Incidencia = { id: number; ocurrio: string; tipo: string; gravedad: string; descripcion: string; estado: string; medidas: string | null };
 
 export default async function Incidencias({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, uid, perfil, veArea } = await conPermiso("incidencias.reportar");
+  const { supabase, uid, perfil } = await conPermiso("incidencias.reportar");
   const { ok, error } = await searchParams;
   const [{ data: mias }, { data: vehiculos }] = await Promise.all([
     supabase.from("incidencias").select("id,ocurrio,tipo,gravedad,descripcion,estado,medidas")
@@ -19,7 +19,7 @@ export default async function Incidencias({ searchParams }: { searchParams: Prom
   ]);
 
   return <>
-    <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
+    <Cabecera nombre={perfil.nombre || perfil.codigo || ""} />
     <main className="contenido estrecho">
       <h1>Incidencias</h1>
       <p className="lead">¿Ha pasado algo? Cuéntalo aquí y le llega a seguridad al momento. Si hay heridos, llama primero al 112.</p>

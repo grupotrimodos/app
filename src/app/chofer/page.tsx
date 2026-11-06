@@ -20,7 +20,7 @@ type Hoy = {
 const horasMin = (h: number) => duracion(Math.round(h * 60));
 
 export default async function PaginaChofer({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { supabase, uid, perfil, veArea } = await conPermiso("chofer.usar");
+  const { supabase, uid, perfil } = await conPermiso("chofer.usar");
   const { ok, error } = await searchParams;
   const [{ data: abierta }, { data: vehs }, { data: f }, consulta] = await Promise.all([
     supabase.from("asignaciones").select("id,inicio,origen,vehiculos(matricula,modelo)").eq("usuario_id", uid).is("fin", null).maybeSingle(),
@@ -41,7 +41,7 @@ export default async function PaginaChofer({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} admin={veArea("admin")} />
+      <Cabecera nombre={perfil.nombre || perfil.codigo || ""} />
       <main className="contenido estrecho">
         <div className="pagina-titulo"><span className="eyebrow">En carretera</span><h1>Mi camión</h1>
           <p>Tu vehículo y tu jornada, a mano.</p></div>

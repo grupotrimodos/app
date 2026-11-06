@@ -46,7 +46,7 @@ export default async function Sincronizacion({ searchParams }: { searchParams: P
 
   return (
     <>
-      <Cabecera nombre={perfil.nombre || perfil.email || ""} admin />
+      <Cabecera nombre={perfil.nombre || perfil.email || ""} />
       <main className="contenido">
         <p><Link href="/admin">← Administración</Link></p>
         <h1>Sincronización con Odoo</h1>
