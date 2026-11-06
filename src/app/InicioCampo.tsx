@@ -1,6 +1,6 @@
 import Link from "next/link";
 import EstadoOdoo from "./EstadoOdoo";
-import Icono from "./Icono";
+import Icono, { ICONOS_AREA } from "./Icono";
 import { fichar, reintentarOdoo } from "./fichaje/acciones";
 import { confirmarDotacion } from "./ropa/acciones";
 import {
@@ -8,6 +8,7 @@ import {
   type Fichaje,
 } from "@/lib/jornada";
 import { misPendientes } from "@/lib/pendientes";
+import { AREAS } from "@/lib/permisos";
 import { CLASE_DOTACION, ESTADO_DOTACION, nombreTemporada, tallasQueFaltan, temporadaActual, textoKit, type LineaKit, type Tallas } from "@/lib/ropa";
 import { usuarioActual } from "@/lib/usuario";
 
@@ -17,7 +18,7 @@ import { usuarioActual } from "@/lib/usuario";
  * Qué aparece lo deciden los permisos de sus perfiles, nunca su nombre.
  */
 export default async function InicioCampo({ nombre, ok, error }: { nombre: string; ok?: string; error?: string }) {
-  const { supabase, uid, esDeSuPuesto } = await usuarioActual();
+  const { supabase, uid, esDeSuPuesto, puede } = await usuarioActual();
   const temporada = temporadaActual();
   const conRopa = esDeSuPuesto("ropa.pedir");
   if (conRopa) await supabase.rpc("preparar_dotaciones");
@@ -60,6 +61,10 @@ export default async function InicioCampo({ nombre, ok, error }: { nombre: strin
     esDeSuPuesto("incidencias.reportar") && { href: "/incidencias", icono: "aviso", texto: "Avisar de una incidencia" },
     esDeSuPuesto("fichaje.fichar") && { href: "/fichaje", icono: "reloj", texto: "Mis fichajes" },
   ].filter((a): a is { href: string; icono: string; texto: string; completa?: boolean } => !!a);
+  // Lo que gestiona además de su puesto (p. ej. un operario que es Responsable: «Mi equipo»). Sale de sus permisos de
+  // gestión, nunca del nombre del perfil; sin menú, es su única forma de llegar.
+  const gestion = AREAS.filter((a) => a.permisos.some((p) => !p.de_puesto && puede(p.id)))
+    .map((a) => ({ href: a.ruta, icono: ICONOS_AREA[a.id] ?? "equipo", texto: a.nombre }));
 
   return <div className="campo">
     <div className="campo-saludo">
@@ -108,6 +113,10 @@ export default async function InicioCampo({ nombre, ok, error }: { nombre: strin
       </>}
       <Link href="/ropa" className="campo-enlace">Mis tallas y cambios de ropa<Icono nombre="flecha" size={16} /></Link>
     </section>}
+
+    {gestion.length > 0 && <nav className="campo-accesos" aria-label="Lo que gestionas">
+      {gestion.map((a) => <Link key={a.href} href={a.href}><Icono nombre={a.icono} size={22} /><span>{a.texto}</span><Icono nombre="flecha" size={18} /></Link>)}
+    </nav>}
 
     {accesos.length > 0 && <nav className="campo-accesos" aria-label="Más cosas">
       {accesos.map((a) => {
