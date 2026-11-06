@@ -134,7 +134,7 @@ def test_salida_sin_entrada_en_odoo_queda_en_error_y_para(entorno):
     _fichaje(sb, 1, "salida", "15:00")
     _fichaje(sb, 2, "entrada", "16:00")
     r = c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json()
-    assert r == {"enviados": 0, "errores": 1}
+    assert r == {"enviados": 0, "errores": 1, "detalle": "En Odoo no hay ninguna entrada abierta que cerrar"}   # el motivo, a la vista
     f1, f2 = sb.tablas["fichajes"]
     assert f1["odoo_estado"] == "error" and "entrada abierta" in f1["odoo_error"] and f2["odoo_estado"] == "pendiente"
 
@@ -184,6 +184,65 @@ def test_ausencia_aprobada_se_crea_en_odoo_con_su_tipo(entorno, monkeypatch):
     assert len(odoo.ausencias) == 1
 
 
+def test_salida_despues_de_una_pausa_no_bloquea_los_envios(entorno):
+    sb, odoo, c = entorno
+    # entrada → pausa → salida (sin volver de la pausa): la pausa ya cierra la asistencia; la salida no tiene nada que cerrar
+    for i, (t, h) in enumerate([("entrada", "07:00"), ("pausa", "13:00"), ("salida", "13:30")], 1):
+        _fichaje(sb, i, t, h)
+    _fichaje(sb, 4, "entrada", "20:00")   # y lo siguiente sigue llegando
+    r = c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json()
+    assert r == {"enviados": 4, "errores": 0}
+    assert {f["odoo_estado"] for f in sb.tablas["fichajes"]} == {"enviado"}
+    assert sorted((a["check_in"], a["check_out"]) for a in odoo.asistencias.values()) == [
+        ("2026-11-02 06:00:00", "2026-11-02 12:00:00"), ("2026-11-02 19:00:00", None)]
+
+
+def test_un_fichaje_que_ya_llego_a_odoo_no_se_repite_ni_bloquea(entorno):
+    sb, odoo, c = entorno
+    # Odoo ya tiene la entrada y la salida de un envío anterior que no se llegó a anotar en la app
+    odoo.asistencias[1] = {"employee_id": 41, "check_in": "2026-11-02 06:00:00", "check_out": "2026-11-02 14:00:00"}
+    odoo.asistencias[2] = {"employee_id": 41, "check_in": "2026-11-02 15:00:00", "check_out": None}
+    _fichaje(sb, 1, "salida", "15:00")    # 14:00 UTC: ya cerrada
+    _fichaje(sb, 2, "entrada", "16:00")   # 15:00 UTC: ya abierta
+    r = c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json()
+    assert r == {"enviados": 2, "errores": 0} and len(odoo.asistencias) == 2
+
+
+def test_la_jornada_empezada_en_modo_prueba_se_cierra_en_modo_prueba(entorno):
+    sb, odoo, c = entorno
+    _fichaje(sb, 1, "entrada", "07:00")
+    sb.tablas["fichajes"][0]["odoo_estado"] = "simulado"   # se fichó antes de activar el envío real
+    _fichaje(sb, 2, "salida", "15:00")
+    r = c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json()
+    assert r == {"enviados": 0, "errores": 0, "simulados": 1}
+    assert sb.tablas["fichajes"][1]["odoo_estado"] == "simulado" and odoo.asistencias == {}
+
+
+def test_una_ausencia_que_ya_esta_en_odoo_no_se_crea_otra_vez(entorno, monkeypatch):
+    sb, odoo, c = entorno
+    monkeypatch.setenv("ODOO_TIPOS_AUSENCIA", '{"vacaciones": 1}')
+    odoo.ausencias[1] = {"employee_id": 41, "tipo_id": 1, "desde": "2026-12-01", "hasta": "2026-12-05", "nombre": "Vacaciones"}
+    sb.tablas["ausencias"].append({"id": 5, "usuario_id": UID, "tipo": "vacaciones", "desde": "2026-12-01", "hasta": "2026-12-05",
+                                   "motivo": None, "estado": "aprobada", "odoo_estado": "error"})
+    r = c.post("/api/rrhh/ausencias/5/sincronizar", headers={"Authorization": "Bearer tok-jefa"}).json()
+    assert r == {"estado": "enviado"} and len(odoo.ausencias) == 1
+
+
+def test_el_motivo_real_del_rechazo_de_odoo_se_guarda(entorno, monkeypatch):
+    from servicios.errors import OdooRechazo
+    sb, odoo, c = entorno
+    monkeypatch.setenv("ODOO_TIPOS_AUSENCIA", '{"vacaciones": 1}')
+
+    def rechaza(*a, **k):
+        raise OdooRechazo("No tiene días suficientes para este tipo de ausencia")
+    monkeypatch.setattr(odoo, "crear_ausencia", rechaza)
+    sb.tablas["ausencias"].append({"id": 5, "usuario_id": UID, "tipo": "vacaciones", "desde": "2026-12-01", "hasta": "2026-12-05",
+                                   "motivo": None, "estado": "aprobada", "odoo_estado": "pendiente"})
+    r = c.post("/api/rrhh/ausencias/5/sincronizar", headers={"Authorization": "Bearer tok-jefa"}).json()
+    assert r == {"estado": "error", "detalle": "Odoo: No tiene días suficientes para este tipo de ausencia"}
+    assert sb.tablas["ausencias"][0]["odoo_error"] == "Odoo: No tiene días suficientes para este tipo de ausencia"
+
+
 def test_ausencia_pendiente_no_se_envia_y_el_tipo_de_odoo_se_elige_solo(entorno, monkeypatch):
     sb, odoo, c = entorno
     monkeypatch.delenv("ODOO_TIPOS_AUSENCIA", raising=False)
@@ -202,7 +261,8 @@ def test_ausencia_sin_tipo_en_odoo_queda_en_error_explicado(entorno, monkeypatch
     monkeypatch.setattr(odoo, "tipos_ausencia", lambda: [{"id": 9, "name": "Formación"}])
     sb.tablas["ausencias"].append({"id": 6, "usuario_id": UID, "tipo": "medico", "desde": "2026-12-01", "hasta": "2026-12-01",
                                    "motivo": None, "estado": "aprobada", "odoo_estado": "pendiente"})
-    assert c.post("/api/rrhh/ausencias/6/sincronizar", headers=ANA).json() == {"estado": "error"}
+    r = c.post("/api/rrhh/ausencias/6/sincronizar", headers=ANA).json()
+    assert r["estado"] == "error" and "tipo de ausencia" in r["detalle"]
     assert "tipo de ausencia" in sb.tablas["ausencias"][0]["odoo_error"] and odoo.ausencias == {}
 
 
@@ -242,7 +302,8 @@ def test_entrada_con_otra_entrada_abierta_en_odoo_queda_en_error(entorno):
     sb, odoo, c = entorno
     odoo.abrir_asistencia(41, "2026-11-01 06:00:00")          # ayer no se cerró
     _fichaje(sb, 1, "entrada", "07:00")
-    assert c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json() == {"enviados": 0, "errores": 1}
+    r = c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json()
+    assert r["enviados"] == 0 and r["errores"] == 1 and "entrada sin cerrar" in r["detalle"]
     assert "sin cerrar" in sb.tablas["fichajes"][0]["odoo_error"] and len(odoo.asistencias) == 1
 
 
@@ -251,7 +312,7 @@ def test_una_correccion_rechazada_por_odoo_no_frena_los_demas(entorno):
     _fichaje(sb, 1, "salida", "06:00", origen="correccion")   # salida sin entrada en Odoo: error
     _fichaje(sb, 2, "entrada", "07:00")
     r = c.post("/api/rrhh/fichajes/sincronizar", json={}, headers=ANA).json()
-    assert r == {"enviados": 1, "errores": 1}
+    assert r["enviados"] == 1 and r["errores"] == 1
     assert [f["odoo_estado"] for f in sb.tablas["fichajes"]] == ["error", "enviado"]
 
 

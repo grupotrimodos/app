@@ -190,6 +190,13 @@ class MockOdoo:
             raise ValueError("La salida no puede ser anterior a la entrada")
         a["check_out"] = check_out
 
+    def asistencia_en(self, empleado_id, campo, momento):
+        return any(a["employee_id"] == empleado_id and a[campo] == momento for a in self.asistencias.values())
+
+    def ausencia_existente(self, empleado_id, desde, hasta):
+        return next((i for i, a in self.ausencias.items()
+                     if a["employee_id"] == empleado_id and a["desde"] == desde and a["hasta"] == hasta), None)
+
     def crear_ausencia(self, empleado_id, tipo_id, desde, hasta, nombre):
         i = 800000 + len(self.ausencias) + 1
         self.ausencias[i] = {"employee_id": empleado_id, "tipo_id": tipo_id, "desde": desde, "hasta": hasta, "nombre": nombre}

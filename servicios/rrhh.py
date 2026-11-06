@@ -15,7 +15,7 @@ import logging
 import os
 import time
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from . import supa
 from .auth import Usuario, requiere_permiso
 from .config import get_settings
-from .errors import AppError
+from .errors import AppError, OdooRechazo
 
 log = logging.getLogger("conductores")
 router = APIRouter(prefix="/api/rrhh", tags=["rrhh"])
@@ -54,10 +54,23 @@ def envio_simulado() -> bool:
     return rrhh_dry_run() or not odoo_real()
 
 
+def _instante(momento: str) -> datetime:
+    """ISO de Supabase → instante (para ordenar fichajes aunque lleguen con distinta zona horaria)."""
+    return datetime.fromisoformat(momento.replace("Z", "+00:00"))
+
+
 def _utc_odoo(momento: str) -> str:
     """ISO de Supabase → «AAAA-MM-DD HH:MM:SS» en UTC, como lo espera Odoo."""
-    dt = datetime.fromisoformat(momento.replace("Z", "+00:00"))
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return _instante(momento).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def motivo_error(e: Exception, general: str) -> str:
+    """Lo que se guarda como motivo de un envío fallido: el aviso propio, el motivo real de Odoo o uno general."""
+    if isinstance(e, ValueError):
+        return str(e)[:300]
+    if isinstance(e, OdooRechazo) and e.detalle:
+        return f"Odoo: {e.detalle}"[:300]
+    return general
 
 
 def _marcar(tabla: str, fila_id: int, estado: str, error: str | None = None) -> None:
@@ -147,36 +160,68 @@ def enviar_fichajes(usuario_id: str, limite: float | None = None) -> dict:
             _marcar("fichajes", f["id"], "sin_empleado", motivo)
         return {"enviados": 0, "errores": 0, "sin_empleado": len(filas)}
 
-    enviados = errores = 0
+    # El fichaje anterior de cada uno decide qué hacer cuando en Odoo no hay nada que cerrar (ver abajo).
+    desde = (datetime.fromisoformat(filas[0]["momento"].replace("Z", "+00:00")) - timedelta(days=2)).isoformat()
+    historial = sorted(supa.leer(token, "fichajes", {"usuario_id": f"eq.{usuario_id}", "momento": f"gte.{desde}",
+                                                   "select": "id,tipo,momento,odoo_estado"}),
+                       key=lambda x: (_instante(x["momento"]), x["id"]))
+
+    def anterior(f: dict) -> dict | None:
+        clave = (_instante(f["momento"]), f["id"])
+        previos = [x for x in historial if (_instante(x["momento"]), x["id"]) < clave]
+        return previos[-1] if previos else None
+
+    enviados = errores = simulados = 0
+    detalle = None
     for f in filas:
         if limite is not None and time.monotonic() > limite:
             break
         if simulado:
             _marcar("fichajes", f["id"], "simulado")
-            enviados += 1
+            simulados += 1
             continue
         try:
             odoo = _odoo()
             momento = _utc_odoo(f["momento"])
             abierta = odoo.asistencia_abierta(emp)
+            estado = "enviado"
+            # Si ya está en Odoo (un envío anterior llegó pero no se anotó), no se repite.
             if f["tipo"] in ("entrada", "reanudar"):
-                if abierta:
+                if odoo.asistencia_en(emp, "check_in", momento):
+                    pass
+                elif abierta:
                     raise ValueError(f"En Odoo hay una entrada sin cerrar ({abierta['check_in']} UTC): ciérrala allí y reintenta")
-                odoo.abrir_asistencia(emp, momento)
+                else:
+                    odoo.abrir_asistencia(emp, momento)
+            elif odoo.asistencia_en(emp, "check_out", momento):
+                pass
             elif abierta:
                 odoo.cerrar_asistencia(abierta["id"], momento)
             else:
-                raise ValueError("En Odoo no hay ninguna entrada abierta que cerrar")
-            _marcar("fichajes", f["id"], "enviado")
-            enviados += 1
+                previo = anterior(f)
+                if f["tipo"] == "salida" and previo and previo["tipo"] == "pausa":
+                    pass   # la pausa ya cerró la asistencia en Odoo: la salida no tiene nada que cerrar
+                elif previo and previo["odoo_estado"] == "simulado":
+                    estado = "simulado"   # la jornada empezó en modo prueba: su cierre tampoco va a Odoo
+                else:
+                    raise ValueError("En Odoo no hay ninguna entrada abierta que cerrar")
+            _marcar("fichajes", f["id"], estado)
+            enviados += estado == "enviado"
+            simulados += estado == "simulado"
         except Exception as e:
             log.warning("Fichaje %s no enviado a Odoo: %s", f["id"], e)
-            _marcar("fichajes", f["id"], "error", str(e)[:300] if isinstance(e, ValueError) else "Odoo no ha aceptado el fichaje")
+            detalle = motivo_error(e, "Odoo no ha aceptado el fichaje")
+            _marcar("fichajes", f["id"], "error", detalle)
             errores += 1
             if f.get("origen") != "correccion":
                 break   # el orden importa: lo siguiente se reintenta cuando se arregle este
             # una corrección con hora pasada que Odoo rechaza se arregla a mano allí; no frena al resto
-    return {"enviados": enviados, "errores": errores}
+    res = {"enviados": enviados, "errores": errores}
+    if simulados:
+        res["simulados"] = simulados
+    if detalle:
+        res["detalle"] = detalle
+    return res
 
 
 def enviar_ausencia(ausencia_id: int) -> str:
@@ -204,10 +249,12 @@ def enviar_ausencia(ausencia_id: int) -> str:
             _marcar("ausencias", a["id"], "error",
                     f"No encuentro en Odoo un tipo de ausencia para «{a['tipo']}»: créalo allí o fíjalo en ODOO_TIPOS_AUSENCIA")
             return "error"
-        _odoo().crear_ausencia(emp, tipo_id, a["desde"], a["hasta"], a.get("motivo") or a["tipo"].replace("_", " ").capitalize())
+        # Si ya está en Odoo (un envío anterior llegó pero no se anotó), no se crea otra igual.
+        if not _odoo().ausencia_existente(emp, a["desde"], a["hasta"]):
+            _odoo().crear_ausencia(emp, tipo_id, a["desde"], a["hasta"], a.get("motivo") or a["tipo"].replace("_", " ").capitalize())
     except Exception as e:
         log.warning("Ausencia %s no enviada a Odoo: %s", a["id"], e)
-        _marcar("ausencias", a["id"], "error", "Odoo no ha aceptado la ausencia")
+        _marcar("ausencias", a["id"], "error", motivo_error(e, "Odoo no ha aceptado la ausencia"))
         return "error"
     _marcar("ausencias", a["id"], "enviado")
     return "enviado"
@@ -238,4 +285,9 @@ def sincronizar_ausencia(ausencia_id: int, u: Usuario = Depends(con_ausencias)):
         return {"estado": "no_aplica"}
     if not supa.leer(u.token, "ausencias", {"id": f"eq.{ausencia_id}", "select": "id"}):
         raise AppError("No encontramos esa ausencia.", 404, "no_encontrada")
-    return {"estado": enviar_ausencia(ausencia_id)}
+    estado = enviar_ausencia(ausencia_id)
+    detalle = None
+    if estado in ("error", "sin_empleado"):   # el motivo, para que quien aprueba sepa qué falta
+        filas = supa.leer(supa.SERVICIO, "ausencias", {"id": f"eq.{ausencia_id}", "select": "odoo_error"})
+        detalle = filas[0].get("odoo_error") if filas else None
+    return {"estado": estado, **({"detalle": detalle} if detalle else {})}

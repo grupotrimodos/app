@@ -12,7 +12,7 @@ from datetime import date, timedelta
 import httpx
 
 from .config import Settings
-from .errors import AppError
+from .errors import AppError, OdooRechazo
 
 log = logging.getLogger("conductores")
 
@@ -187,7 +187,7 @@ class OdooClient:
         except httpx.HTTPError:
             raise AppError("No hay conexión con el sistema. Inténtalo de nuevo.", 503, "sin_conexion")
         if "error" in data:
-            raise AppError("El sistema no ha podido responder. Inténtalo de nuevo.", 502, "odoo_error")
+            raise OdooRechazo(str((data["error"].get("data") or {}).get("message") or data["error"].get("message") or ""))
         return data["result"]
 
     def _login(self) -> int:
@@ -255,6 +255,20 @@ class OdooClient:
 
     def abrir_asistencia(self, empleado_id: int, check_in: str) -> int:
         return self._call(ATTENDANCE_MODEL, "create", [{"employee_id": int(empleado_id), "check_in": check_in}])
+
+    def asistencia_en(self, empleado_id: int, campo: str, momento: str) -> bool:
+        """¿Ya hay una asistencia de ese empleado con esa entrada (check_in) o esa salida (check_out)? Pasa si un envío
+        anterior llegó a Odoo pero no se llegó a anotar en la app: así no se repite."""
+        if campo not in ("check_in", "check_out"):
+            raise ValueError(campo)
+        return bool(self._call(ATTENDANCE_MODEL, "search_count", [[["employee_id", "=", int(empleado_id)], [campo, "=", momento]]]))
+
+    def ausencia_existente(self, empleado_id: int, desde: str, hasta: str) -> int | None:
+        """Solicitud de ausencia de ese empleado con esas fechas que siga viva en Odoo (no rechazada ni cancelada)."""
+        rows = self._call(LEAVE_MODEL, "search_read", [[["employee_id", "=", int(empleado_id)], ["request_date_from", "=", desde],
+                                                        ["request_date_to", "=", hasta], ["state", "not in", ["refuse", "cancel"]]]],
+                          {"fields": ["id"], "limit": 1})
+        return rows[0]["id"] if rows else None
 
     def cerrar_asistencia(self, asistencia_id: int, check_out: str) -> None:
         self._call(ATTENDANCE_MODEL, "write", [[int(asistencia_id)], {"check_out": check_out}])
