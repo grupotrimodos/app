@@ -29,12 +29,12 @@ export async function cambiarZona(form: FormData) {
 
 /** Guarda de una vez la zona de todos los chóferes de la lista (zona_<id> = id de la zona o vacío). */
 export async function asignarZonas(form: FormData) {
-  const { supabase } = await conPermiso("zonas.gestionar");
+  const { supabase, uid } = await conPermiso("zonas.gestionar");
   const cambios = [...form.entries()].filter(([k]) => k.startsWith("zona_") && /^[0-9a-f-]{36}$/.test(k.slice(5)))
     .map(([k, v]) => ({ usuario_id: k.slice(5), zona_id: Number(v) || null, antes: Number(form.get(`antes_${k.slice(5)}`)) || null }))
     .filter((c) => c.zona_id !== c.antes);
   if (!cambios.length) return volver("No has cambiado nada.");
-  const poner = cambios.filter((c) => c.zona_id).map(({ usuario_id, zona_id }) => ({ usuario_id, zona_id, asignado_en: new Date().toISOString() }));
+  const poner = cambios.filter((c) => c.zona_id).map(({ usuario_id, zona_id }) => ({ usuario_id, zona_id, asignado_por: uid, asignado_en: new Date().toISOString() }));
   const quitar = cambios.filter((c) => !c.zona_id).map((c) => c.usuario_id);
   const [a, b] = await Promise.all([
     poner.length ? supabase.from("chofer_zona").upsert(poner).select("usuario_id") : Promise.resolve({ data: [], error: null }),
