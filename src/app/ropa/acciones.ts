@@ -88,7 +88,9 @@ export async function anularRopa(form: FormData) {
 /** El responsable aprueba o rechaza (nunca lo suyo: lo impide la base de datos). */
 export async function resolverRopa(form: FormData) {
   const { supabase, uid } = await conPermiso("ropa.gestionar");
-  const aprobar = form.get("decision") === "aprobar";
+  const decision = form.get("decision");
+  if (decision !== "aprobar" && decision !== "rechazar") return volver("Pulsa «Aprobar» o «Rechazar».", "error");
+  const aprobar = decision === "aprobar";
   const comentario = String(form.get("comentario") ?? "").trim().slice(0, 300) || null;
   if (!aprobar && !comentario) return volver("Para rechazarlo, explica el motivo en el comentario.", "error");
   const { data } = await supabase.from("solicitudes_ropa")

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Cabecera from "../Cabecera";
 import QuienAprueba from "../QuienAprueba";
+import SinEnvioConIntro from "../SinEnvioConIntro";
 import { fecha } from "@/lib/jornada";
 import {
   CLASE_DOTACION, CLASE_ROPA, ESTADO_DOTACION, ESTADO_ROPA, GRUPOS_TALLA, MAX_UNIDADES, MOTIVOS_CAMBIO, MOTIVOS_ROPA, nombreTemporada,
@@ -299,6 +300,7 @@ async function Cambios({ uid }: { uid: string }) {
           <ul className="lista-ropa">{s.prendas.map((l, i) => <li key={i}>{textoLinea(l)}</li>)}</ul>
           {s.nota && <p className="hint">«{s.nota}»</p>}
           <form action={resolverRopa} className="fila-form">
+            <SinEnvioConIntro />
             <input type="hidden" name="id" value={s.id} />
             <div className="crece"><label htmlFor={`com-${s.id}`}>Comentario (obligatorio si lo rechazas)</label>
               <input id={`com-${s.id}`} name="comentario" maxLength={300} /></div>

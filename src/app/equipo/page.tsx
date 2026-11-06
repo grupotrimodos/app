@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SinEnvioConIntro from "../SinEnvioConIntro";
 import Cabecera from "../Cabecera";
 import EstadoOdoo from "../EstadoOdoo";
 import { centrosConPermiso, conPermiso } from "@/lib/usuario";
@@ -120,6 +121,7 @@ export default async function PaginaEquipo({ searchParams }: { searchParams: Pro
           <p className="hint">De todas las personas que tienes a tu cargo, de cualquier centro.</p>
           {pendientes.length === 0 ? <p className="hint">No hay solicitudes pendientes.</p> : pendientes.map((a) => (
             <form key={a.id} action={resolverAusencia} className="solicitud">
+              <SinEnvioConIntro />
               <input type="hidden" name="id" value={a.id} />
               <p><b>{nombrePendiente.get(a.usuario_id) ?? "—"}</b> <span className="hint">({centroDe.get(a.usuario_id) ?? "Sin centro"})</span>
                 {" "}· {NOMBRE_AUSENCIA[a.tipo]} · {fecha(a.desde + "T12:00:00Z")}

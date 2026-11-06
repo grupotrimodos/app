@@ -14,7 +14,9 @@ const volver = (msg: string, tipo: "ok" | "error" = "ok") => redirect(`/equipo?$
 export async function resolverAusencia(form: FormData) {
   const { supabase, uid } = await conPermiso("ausencias.aprobar");
   const id = Number(form.get("id"));
-  const aprobar = form.get("decision") === "aprobar";
+  const decision = form.get("decision");
+  if (decision !== "aprobar" && decision !== "rechazar") return volver("Pulsa «Aprobar» o «Rechazar».", "error");
+  const aprobar = decision === "aprobar";
   const comentario = String(form.get("comentario") ?? "").trim().slice(0, 300) || null;
   // Los permisos de la base de datos impiden resolver las propias o las de fuera de tus centros.
   // Al rechazar, la base de datos marca sola que no va a Odoo (el estado de envío solo lo cambia el servidor).
