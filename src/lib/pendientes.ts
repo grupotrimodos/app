@@ -53,11 +53,11 @@ export const misPendientes = cache(async function misPendientes() {
     detalle: "De las personas que tienes a tu cargo" });
   if (ropaP) {
     const n = cuenta(ropaP), m = cuenta(ropaA), t = cuenta(ropaT);
-    tareas.push({ id: "ropa-temporada", titulo: "Ropa de temporada por entregar", cantidad: t, href: "/ropa?ver=temporada", icono: "ropa",
+    tareas.push({ id: "ropa-temporada", titulo: "Ropa de temporada por entregar", cantidad: t, href: "/seguridad?ver=ropa&ropa=temporada", icono: "ropa",
       detalle: "Dos mudas por persona: márcalas como entregadas al darlas" });
-    tareas.push({ id: "ropa", titulo: "Cambios de ropa por aprobar", cantidad: n, href: "/ropa?ver=cambios", icono: "ropa",
+    tareas.push({ id: "ropa", titulo: "Cambios de ropa por aprobar", cantidad: n, href: "/seguridad?ver=ropa&ropa=cambios", icono: "ropa",
       detalle: "Roturas, tallas o pérdidas de las personas de tus centros" });
-    if (m) tareas.push({ id: "ropa-entregar", titulo: "Cambios de ropa por entregar", cantidad: m, href: "/ropa?ver=cambios", icono: "ropa",
+    if (m) tareas.push({ id: "ropa-entregar", titulo: "Cambios de ropa por entregar", cantidad: m, href: "/seguridad?ver=ropa&ropa=cambios", icono: "ropa",
       detalle: "Aprobados: márcalos como entregados al darlos" });
   }
   const dot = miDot?.data;

@@ -366,7 +366,7 @@ export default async function CuadroDeMando({ ver, empresa = "", base = "/" }: {
   // Una cifra solo es enlace si quien mira puede abrir esa pantalla (si no, le devolvería al inicio).
   const si = (href: string, ...ps: string[]) => (puede(...ps) ? href : undefined);
   const a = {
-    equipo: si("/equipo", ...permisosDe("equipo")), ropa: si("/ropa?ver=temporada", "ropa.gestionar"), cambios: si("/ropa?ver=cambios", "ropa.gestionar"),
+    equipo: si("/equipo", ...permisosDe("equipo")), ropa: si("/seguridad?ver=ropa&ropa=temporada", "ropa.gestionar"), cambios: si("/seguridad?ver=ropa&ropa=cambios", "ropa.gestionar"),
     seguridad: si("/seguridad", "seguridad.ver", "seguridad.gestionar"), incidencias: si("/seguridad?ver=incidencias", "seguridad.ver", "seguridad.gestionar"),
     configurar: si("/admin?ver=personas&estado=configurar", "admin.usuarios"), sincronizacion: si("/admin/sincronizacion", "admin.sincronizacion"),
     zonas: si("/equipo/zonas", "zonas.gestionar"), analitica: si("/admin?ver=centros", "admin.usuarios"),

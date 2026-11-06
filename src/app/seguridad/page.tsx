@@ -8,6 +8,8 @@ import {
   type Caducidad, type Documento,
 } from "@/lib/seguridad";
 import { conPermiso } from "@/lib/usuario";
+import { nombreTemporada, temporadaActual } from "@/lib/ropa";
+import { Cambios, Composicion, Temporada } from "../ropa/secciones";
 import {
   anotarInspeccion, anotarRevision, crearEquipo, guardarDocumentoPersona, guardarDocumentoVehiculo, seguirIncidencia,
 } from "./acciones";
@@ -17,8 +19,11 @@ export const metadata = { title: "Seguridad · Grupo Trimodos" };
 
 const PESTANAS = [
   ["resumen", "Resumen"], ["vehiculos", "Vehículos"], ["personas", "Personas"], ["almacenes", "Carretillas y almacenes"],
-  ["incidencias", "Incidencias"],
+  ["incidencias", "Incidencias"], ["ropa", "Ropa y EPIs"],
 ] as const;
+/** Apartados de «Ropa y EPIs» y el permiso que pide cada uno. */
+const APARTADOS_ROPA = [["temporada", "Temporada", "ropa.gestionar"], ["cambios", "Cambios", "ropa.gestionar"],
+  ["composicion", "Composición", "ropa.configurar"]] as const;
 
 type Vehiculo = { id: number; matricula: string; modelo: string | null };
 type Usuario = { id: string; nombre: string; email: string | null; codigo: string | null; activo: boolean };
@@ -57,16 +62,55 @@ function FormDocumento({ accion, campo, valor, tipo, nombre, doc }: {
   </form>;
 }
 
-export default async function Seguridad({ searchParams }: { searchParams: Promise<{ ver?: string; ok?: string; error?: string }> }) {
-  const { supabase, perfil, puede } = await conPermiso("seguridad.ver", "seguridad.gestionar", "vehiculos.gestionar");
-  const { ver: pedida, ok, error } = await searchParams;
+export default async function Seguridad({ searchParams }: {
+  searchParams: Promise<{ ver?: string; ok?: string; error?: string; ropa?: string; centro?: string; todas?: string }>;
+}) {
+  const { supabase, uid, perfil, puede } = await conPermiso("seguridad.ver", "seguridad.gestionar", "vehiculos.gestionar",
+    "ropa.gestionar", "ropa.configurar");
+  const { ver: pedida, ok, error, ropa, centro, todas } = await searchParams;
   const veTodo = puede("seguridad.ver", "seguridad.gestionar");
   const gestiona = puede("seguridad.gestionar");
   const editaVehiculos = puede("seguridad.gestionar", "vehiculos.gestionar");
-  // Quien solo gestiona camiones ve únicamente su documentación (ITV, seguro, tacógrafo).
-  const pestanas = PESTANAS.filter(([id]) => veTodo || id === "vehiculos");
+  // Cada pestaña, solo a quien tiene su permiso: quien solo gestiona camiones ve su documentación (ITV, seguro,
+  // tacógrafo); quien gestiona la ropa (p. ej. un Responsable), solo «Ropa y EPIs».
+  const pestanas = PESTANAS.filter(([id]) => id === "ropa" ? puede("ropa.gestionar", "ropa.configurar")
+    : id === "vehiculos" ? editaVehiculos || veTodo : veTodo);
   const ver = pestanas.find(([id]) => id === pedida)?.[0] ?? pestanas[0][0];
   const hoy = hoyISO();
+  const marco = (contenido: React.ReactNode, abiertas = 0) => <>
+    <Cabecera nombre={perfil.nombre || perfil.email || perfil.codigo || ""} />
+    <main className="contenido">
+      <h1>Seguridad</h1>
+      <p className="lead">Caducidades de vehículos y personas, carretillas, inspecciones de almacén, incidencias y ropa de trabajo y EPIs.
+        Se avisa 30 días antes.</p>
+      {ok && <p className="aviso" role="status">{ok}</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {pestanas.length > 1 && <nav className="pestanas" aria-label="Apartados de seguridad">
+        {pestanas.map(([id, nombre]) => <Link key={id} href={`/seguridad?ver=${id}`} className={id === ver ? "activa" : ""}
+          aria-current={id === ver ? "page" : undefined}>{nombre}{id === "incidencias" && abiertas ? ` (${abiertas})` : ""}</Link>)}
+      </nav>}
+      {contenido}
+    </main>
+  </>;
+
+  // Ropa de trabajo y EPIs: dotación de temporada, cambios y composición por puesto (sin cargar el resto de Seguridad).
+  if (ver === "ropa") {
+    const apartados = APARTADOS_ROPA.filter(([, , permiso]) => puede(permiso));
+    const apartado = apartados.find(([id]) => id === ropa)?.[0] ?? apartados[0][0];
+    const t = temporadaActual();
+    await supabase.rpc("preparar_dotaciones");   // la dotación de la temporada se prepara sola
+    return marco(<>
+      <p className="hint">Ropa de {nombreTemporada(t)}: dos mudas completas por persona y temporada, sin que nadie las pida.</p>
+      {apartados.length > 1 && <nav className="pestanas subpestanas" aria-label="Apartados de ropa y EPIs">
+        {apartados.map(([id, nombre]) => <Link key={id} href={`/seguridad?ver=ropa&ropa=${id}`} className={id === apartado ? "activa" : ""}
+          aria-current={id === apartado ? "page" : undefined}>{nombre}</Link>)}
+      </nav>}
+      {apartado === "temporada" && <Temporada uid={uid} esAdmin={perfil.es_admin} temporada={t} centro={centro} todas={todas === "1"}
+        ruta="/seguridad" fijos={{ ver: "ropa", ropa: "temporada" }} />}
+      {apartado === "cambios" && <Cambios uid={uid} />}
+      {apartado === "composicion" && <Composicion />}
+    </>);
+  }
 
   const [vehiculosR, documentosR, usuariosR, perfilesR, equiposR, revisionesR, inspeccionesR, incidenciasR, cerradasR, centrosR] = await Promise.all([
     supabase.from("vehiculos").select("id,matricula,modelo").eq("activo", true).order("matricula").returns<Vehiculo[]>(),
@@ -128,18 +172,7 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
   const abiertas = incidencias.filter((i) => i.estado !== "cerrada");
   const cuenta = (e: Caducidad) => urgente.filter((u) => u.estado === e).length;
 
-  return <>
-    <Cabecera nombre={perfil.nombre || perfil.email || perfil.codigo || ""} />
-    <main className="contenido">
-      <h1>Seguridad</h1>
-      <p className="lead">Caducidades de vehículos y personas, carretillas, inspecciones de almacén e incidencias. Se avisa 30 días antes.</p>
-      {ok && <p className="aviso" role="status">{ok}</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-      {pestanas.length > 1 && <nav className="pestanas" aria-label="Apartados de seguridad">
-        {pestanas.map(([id, nombre]) => <Link key={id} href={`/seguridad?ver=${id}`} className={id === ver ? "activa" : ""}
-          aria-current={id === ver ? "page" : undefined}>{nombre}{id === "incidencias" && abiertas.length ? ` (${abiertas.length})` : ""}</Link>)}
-      </nav>}
-
+  return marco(<>
       {ver === "resumen" && <>
         <div className="inicio-kpis">
           <Link className={`inicio-kpi ${cuenta("caducado") ? "atencion" : ""}`} href="#urgente"><span className="inicio-kpi-titulo"><Icono nombre="aviso" size={18} />Caducados</span>
@@ -294,6 +327,5 @@ export default async function Seguridad({ searchParams }: { searchParams: Promis
           </li>)}
         </ul>}
       </section>}
-    </main>
-  </>;
+  </>, abiertas.length);
 }

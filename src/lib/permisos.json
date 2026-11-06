@@ -55,12 +55,10 @@
       ]
     },
     {
-      "id": "ropa", "nombre": "Ropa de trabajo", "ruta": "/ropa",
-      "descripcion": "Dotación de ropa de cada temporada (dos mudas) y cambios por rotura, talla o pérdida.",
+      "id": "ropa", "nombre": "Mi ropa", "ruta": "/ropa",
+      "descripcion": "Tu ropa de cada temporada (dos mudas), tus tallas y los cambios por rotura, talla o pérdida. La gestión está en Seguridad.",
       "permisos": [
-        { "id": "ropa.pedir", "nombre": "Recibir su ropa de cada temporada, apuntar sus tallas y pedir cambios", "de_puesto": true },
-        { "id": "ropa.gestionar", "nombre": "Entregar la ropa de temporada y resolver los cambios de las personas de sus centros" },
-        { "id": "ropa.configurar", "nombre": "Decidir qué lleva la muda de cada puesto en verano y en invierno y cuántas mudas tocan" }
+        { "id": "ropa.pedir", "nombre": "Recibir su ropa de cada temporada, apuntar sus tallas y pedir cambios", "de_puesto": true }
       ]
     },
     {
@@ -72,10 +70,12 @@
     },
     {
       "id": "seguridad", "nombre": "Seguridad", "ruta": "/seguridad",
-      "descripcion": "Caducidades de vehículos y personas, carretillas y traspaletas, inspecciones de almacén e incidencias.",
+      "descripcion": "Caducidades de vehículos y personas, carretillas y traspaletas, inspecciones de almacén, incidencias y ropa de trabajo y EPIs.",
       "permisos": [
         { "id": "seguridad.ver", "nombre": "Ver el panel de seguridad de todos los centros (caducidades, equipos, inspecciones e incidencias)" },
-        { "id": "seguridad.gestionar", "nombre": "Gestionar seguridad: documentación de todos, carretillas, inspecciones y seguimiento de incidencias" }
+        { "id": "seguridad.gestionar", "nombre": "Gestionar seguridad: documentación de todos, carretillas, inspecciones y seguimiento de incidencias" },
+        { "id": "ropa.gestionar", "nombre": "Ropa y EPIs: entregar la ropa de temporada y resolver los cambios de las personas de sus centros" },
+        { "id": "ropa.configurar", "nombre": "Ropa y EPIs: decidir qué lleva la muda de cada puesto en verano y en invierno y cuántas mudas tocan" }
       ]
     },
     {

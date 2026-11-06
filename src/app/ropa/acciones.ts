@@ -5,11 +5,11 @@ import { leerKit, leerLineas, leerTallas, MOTIVOS_CAMBIO } from "@/lib/ropa";
 import { conPermiso } from "@/lib/usuario";
 import { volverA } from "@/lib/volver";
 
-/** Vuelve a la pantalla de origen con el mensaje: el inicio del móvil (si el formulario lo pide con volver="/") o la de
- *  ropa con su misma pestaña y filtros (src/lib/volver.ts). */
+/** Vuelve a la pantalla de origen con el mensaje: el inicio del móvil (si el formulario lo pide con volver="/"), Seguridad
+ *  → Ropa y EPIs (la gestión) o «Mi ropa», con su misma pestaña y filtros (src/lib/volver.ts). */
 async function volver(msg: string, tipo: "ok" | "error" = "ok", form?: FormData): Promise<never> {
   if (form?.get("volver") === "/") redirect(`/?${tipo}=${encodeURIComponent(msg)}`);
-  return volverA("/ropa", msg, tipo);
+  return volverA(["/seguridad", "/ropa"], msg, tipo);
 }
 
 function hecho(msg: string, form?: FormData) {

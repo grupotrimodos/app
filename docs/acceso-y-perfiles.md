@@ -34,7 +34,7 @@
   - **Personas:** búsqueda, filtros por centro, perfil y estado y páginas de 50. Quien entra por primera vez con Google o Microsoft aparece en «Por configurar» y se activa **en bloque**: se marcan, se elige puesto y centro, y listo. «Cambiar puesto» sustituye el puesto y conserva los complementos.
   - **Perfiles**, **Centros** (con su analítica de Odoo) y **Camiones**.
   - Cada acción vuelve a la misma pestaña con sus filtros.
-- **Ropa por temporada** (`/ropa`; tablas `ropa_kits`, `tallas_ropa`, `ropa_dotaciones`):
+- **Ropa por temporada** (gestión en **Seguridad → Ropa y EPIs**, `/seguridad?ver=ropa`; la de cada persona en «Mi ropa», `/ropa`; partes en `src/app/ropa/secciones.tsx`; tablas `ropa_kits`, `tallas_ropa`, `ropa_dotaciones`):
   - **Temporadas y dotación:** el verano va del 1 de abril al 30 de septiembre y el invierno del 1 de octubre al 31 de marzo. Cada puesto tiene la composición de **una muda** por temporada y cuántas mudas tocan (2). La dotación de cada persona se prepara sola (`public.preparar_dotaciones()`), así que nadie la tiene que pedir. Las dotaciones aún sin entregar siguen a quién le toca ahora: si alguien se da de baja o cambia a un puesto sin ropa, la suya desaparece de la lista.
   - **Tallas:** cada uno apunta cuatro tallas: parte de arriba, pantalón, calzado y guantes. Puede hacerlo también su responsable.
   - **Entrega y confirmación:** el responsable ve **qué preparar**, con unidades por prenda y talla para el pedido al proveedor, y marca cada dotación como entregada. La persona confirma que la ha recibido. Nadie se entrega lo suyo.

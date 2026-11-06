@@ -518,3 +518,7 @@ a.cm-alerta:hover { box-shadow: 0 5px 16px #18273710; }
   .admin-personas td { border: 0; padding: 4px 0; }
   .admin-editar[open] { min-width: 0; }
 }
+
+/* Subpestañas dentro de una pestaña (Seguridad → Ropa y EPIs) */
+.pestanas.subpestanas { margin-top: -6px; }
+.pestanas.subpestanas a { min-height: 40px; font-size: 14px; }
