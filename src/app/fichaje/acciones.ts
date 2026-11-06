@@ -22,7 +22,9 @@ export async function fichar(form: FormData) {
   const estado = estadoDe((data ?? []) as Fichaje[]);
   if (!SIGUIENTES[estado].includes(tipo)) return volver(a, "Ese fichaje no corresponde ahora. Recarga la página.", "error");
   const { error } = await supabase.from("fichajes").insert({ tipo, origen: "app" });
-  if (error) return volver(a, "No se ha podido fichar. Inténtalo de nuevo.", "error");
+  // La base de datos rechaza un fichaje fuera de orden (p. ej. dos entradas seguidas desde dos móviles).
+  if (error) return volver(a, error.code === "23514" ? "Ese fichaje no corresponde ahora. Recarga la página."
+    : "No se ha podido fichar. Inténtalo de nuevo.", "error");
   await llamarPython("/api/rrhh/fichajes/sincronizar", { method: "POST", body: {} });
   revalidatePath("/");
   revalidatePath("/fichaje");

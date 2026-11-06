@@ -18,7 +18,9 @@ export async function pedirAusencia(form: FormData) {
   if (hasta < desde) return volver("La fecha «hasta» no puede ser anterior a «desde».", "error");
   if (tipo !== "medico" && desde < hoyISO()) return volver("No se pueden pedir días ya pasados. Habla con tu responsable.", "error");
   const { error } = await supabase.from("ausencias").insert({ tipo, desde, hasta, motivo });
-  if (error) return volver("No se ha podido enviar la solicitud.", "error");
+  // La base de datos no deja dos solicitudes vivas que se pisen (p. ej. por pulsar dos veces).
+  if (error) return volver(error.code === "23P01" ? "Ya tienes una solicitud que coincide con esas fechas."
+    : "No se ha podido enviar la solicitud.", "error");
   revalidatePath("/ausencias");
   volver("Solicitud enviada. Tu responsable la revisará.");
 }
