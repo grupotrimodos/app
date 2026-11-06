@@ -1,4 +1,5 @@
 import Cabecera from "../Cabecera";
+import { destinoSeguro } from "@/lib/destino";
 import Icono from "../Icono";
 import FormularioLogin from "./FormularioLogin";
 import { ALCANCE_OUTLOOK, calendarioActivo } from "@/lib/outlook";
@@ -7,8 +8,7 @@ export const metadata = { title: "Entrar · Grupo Trimodos" };
 
 export default async function Login({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const { next, error } = await searchParams;
-  // Una barra inversa también puede interpretarse como separador de host en el navegador.
-  const destino = next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
+  const destino = destinoSeguro(next);
   return <>
     <Cabecera />
     <main className="login-pagina">

@@ -38,7 +38,7 @@ export async function actualizarSesion(request: NextRequest) {
   if (!conSesion && !publica && !ruta.startsWith("/api/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.search = ruta === "/" ? "" : `?next=${encodeURIComponent(ruta + request.nextUrl.search)}`;
+    url.search = ruta === "/" || ruta === "/salir" ? "" : `?next=${encodeURIComponent(ruta + request.nextUrl.search)}`;
     return NextResponse.redirect(url);
   }
   return response;
